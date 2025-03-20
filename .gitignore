@@ -1,0 +1,6 @@
+# ignore all files in any directory named target
+*/target/
+
+# ignore all files in any directory named .idea
+*/.idea/
+

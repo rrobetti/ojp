@@ -1,0 +1,42 @@
+syntax = "proto3";
+option java_multiple_files = true;
+package com.openjdbcproxy.grpc;
+
+message ConnectionDetails {
+    string url = 1;
+    string user = 2;
+    string password = 3;
+}
+
+message OpContext {
+    string connHash = 1;
+}
+
+enum ResultType {
+    INTEGER = 0;
+    RESULT_SET = 1;
+}
+
+message OpResult {
+    ResultType type = 1;
+    bytes value = 2;
+}
+
+message StatementRequest {
+    OpContext context = 1;
+    string sql = 2;
+    bytes parameters = 3;
+}
+
+message SqlErrorResponse {
+    string reason = 1;
+    string sqlState = 2;
+    int32 vendorCode = 3;
+}
+
+
+service StatementService {
+    rpc connect(ConnectionDetails) returns (OpContext);
+    rpc executeUpdate(StatementRequest) returns (OpResult);
+    rpc executeQuery(StatementRequest) returns (OpResult);
+}
