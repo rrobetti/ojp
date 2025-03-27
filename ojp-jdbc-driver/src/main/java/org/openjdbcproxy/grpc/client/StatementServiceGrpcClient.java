@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.OpContext;
 import com.openjdbcproxy.grpc.OpResult;
+import com.openjdbcproxy.grpc.ResultSetId;
 import com.openjdbcproxy.grpc.StatementRequest;
 import com.openjdbcproxy.grpc.StatementServiceGrpc;
 import io.grpc.ManagedChannel;
@@ -26,11 +27,11 @@ import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
  */
 public class StatementServiceGrpcClient implements StatementService {
 
-    private StatementServiceGrpc.StatementServiceBlockingStub statemetServiceStub;
-    private ManagedChannel channel = null;
+    private final StatementServiceGrpc.StatementServiceBlockingStub statemetServiceStub;
 
     public StatementServiceGrpcClient() {
-        channel = ManagedChannelBuilder.forAddress("localhost", 8080)
+        //Once channel is open it remains open and is shared among all requests.
+        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 8080)
                 .usePlaintext()
                 .build();
 
@@ -69,12 +70,12 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public void close() {
+    public OpQueryResult readResultSetData(String resultSetUUID) throws SQLException {
         try {
-            this.channel.shutdown();
-            this.channel.awaitTermination(10, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            OpResult result = this.statemetServiceStub.readResultSetData(ResultSetId.newBuilder().setUuid(resultSetUUID).build());
+            return deserialize(result.getValue().toByteArray(), OpQueryResult.class);
+        } catch (StatusRuntimeException e) {
+            throw handle(e);
         }
     }
 }

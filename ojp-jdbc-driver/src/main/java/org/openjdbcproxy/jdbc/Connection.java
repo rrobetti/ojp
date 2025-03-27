@@ -72,11 +72,6 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public void close() throws SQLException {
-        try {
-            this.statementService.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     @Override

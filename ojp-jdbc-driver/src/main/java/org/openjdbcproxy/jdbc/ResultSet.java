@@ -1,5 +1,8 @@
 package org.openjdbcproxy.jdbc;
 
+import org.openjdbcproxy.grpc.client.StatementService;
+import org.openjdbcproxy.grpc.dto.OpQueryResult;
+
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -20,20 +23,62 @@ import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ResultSet implements java.sql.ResultSet {
 
+    private StatementService statementService;
     private List<Object[]> rows;
+    private CompletableFuture<OpQueryResult> cfNextRows;// Data fetched ahead of time for performance
     private AtomicInteger index = new AtomicInteger(-1);
+    private String resultSetUUID;
+    private boolean moreData;
 
-    public ResultSet(List<Object[]> rows) {
+    public ResultSet(OpQueryResult queryResult, StatementService statementService, List<Object[]> rows) {
+        this.statementService = statementService;
         this.rows = rows;
+        this.resultSetUUID = queryResult.getResultSetUUID();
+        this.moreData = queryResult.isMoreData();
     }
 
     @Override
     public boolean next() throws SQLException {
-        return index.incrementAndGet() < rows.size();
+        int incrementedIndex = index.incrementAndGet();
+        if (this.moreData) {
+            if (incrementedIndex == 0) {
+                this.fetchNextRecordsAsync();
+            } else if (incrementedIndex >= this.rows.size()) {
+                synchronized (ResultSet.class) {
+                    try {
+                        this.rows = this.cfNextRows.get().getRows();
+                        this.moreData = this.cfNextRows.get().isMoreData();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    } catch (ExecutionException e) {
+                        throw new RuntimeException(e);
+                    }
+                    this.cfNextRows = null;
+                    this.index.set(0);
+                }
+            }
+        }
+        return incrementedIndex < rows.size();
+    }
+
+    private void fetchNextRecordsAsync() throws SQLException {
+        synchronized (ResultSet.class) {
+            this.cfNextRows = CompletableFuture.supplyAsync(() -> {
+                OpQueryResult result = null;
+                try {
+                    result = this.statementService.readResultSetData(this.resultSetUUID);
+                    return  result;
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);//TODO see how to propagate the SQLException instead of wrapping here.
+                }
+            });
+        }
     }
 
     @Override

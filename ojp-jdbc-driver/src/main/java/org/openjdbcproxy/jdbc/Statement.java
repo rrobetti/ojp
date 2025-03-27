@@ -22,7 +22,7 @@ public class Statement implements java.sql.Statement {
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
         OpQueryResult queryResult = this.statementService.executeQuery(this.ctx, sql, EMPTY_PARAMETERS_LIST);
-        return new ResultSet(queryResult.getRows());
+        return new ResultSet(queryResult, this.statementService, queryResult.getRows());
     }
 
     @Override

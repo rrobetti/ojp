@@ -10,6 +10,11 @@ message ConnectionDetails {
 
 message OpContext {
     string connHash = 1;
+    string clientUUID = 2;
+}
+
+message ResultSetId {
+    string uuid = 1;
 }
 
 enum ResultType {
@@ -39,4 +44,5 @@ service StatementService {
     rpc connect(ConnectionDetails) returns (OpContext);
     rpc executeUpdate(StatementRequest) returns (OpResult);
     rpc executeQuery(StatementRequest) returns (OpResult);
+    rpc readResultSetData(ResultSetId) returns (OpResult);
 }

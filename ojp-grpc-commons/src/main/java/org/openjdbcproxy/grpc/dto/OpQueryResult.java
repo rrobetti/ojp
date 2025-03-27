@@ -4,7 +4,6 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.io.Serializable;
-import java.sql.ResultSetMetaData;
 import java.util.List;
 
 /**
@@ -13,8 +12,7 @@ import java.util.List;
 @Builder
 @Getter
 public class OpQueryResult implements Serializable {
-    //TODO it is not possible to return this because it is not serializable and it is expensive to translate it for all columns
-    //need to find another way maybe return basic metadata
-    //ResultSetMetaData resultSetMetaData;
+    String resultSetUUID;
+    boolean moreData;
     List<Object[]> rows;
 }

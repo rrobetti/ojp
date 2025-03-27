@@ -49,7 +49,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     public ResultSet executeQuery() throws SQLException {
         OpQueryResult queryResult = this.statementService
                 .executeQuery(this.ctx, this.sql, this.paramsMap.values().stream().toList());
-        return new ResultSet(queryResult.getRows());
+        return new ResultSet(queryResult, this.statementService, queryResult.getRows());
     }
 
     @Override
