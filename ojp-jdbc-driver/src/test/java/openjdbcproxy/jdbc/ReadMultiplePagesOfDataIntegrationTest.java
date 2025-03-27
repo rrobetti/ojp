@@ -1,7 +1,8 @@
 package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -11,8 +12,9 @@ import java.sql.Statement;
 
 public class ReadMultiplePagesOfDataIntegrationTest {
 
-    @Test
-    public void multiplePagesOfRowsResultSetSuccessful() throws SQLException, ClassNotFoundException {
+    @ParameterizedTest
+    @ValueSource(ints = {1,99,100,101,1000,10000})
+    public void multiplePagesOfRowsResultSetSuccessful(int totalRecords) throws SQLException, ClassNotFoundException {
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
@@ -32,16 +34,16 @@ public class ReadMultiplePagesOfDataIntegrationTest {
                            title VARCHAR(50) NOT NULL)
                 """);
 
-        for (int i = 0; i < 150; i++) { //TODO make this test parameterized with multiple parameters
+        for (int i = 0; i < totalRecords; i++) { //TODO make this test parameterized with multiple parameters
             this.executeUpdate(conn,
                     "insert into test_table_multi (id, title) values (" + i + ", 'TITLE_" + i + "')"
             );
         }
 
-        java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table_multi");
+        java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table_multi order by id");
         ResultSet resultSet = psSelect.executeQuery();
 
-        for (int i = 0; i < 150; i++) {
+        for (int i = 0; i < totalRecords; i++) {
             resultSet.next();
             int id = resultSet.getInt(1);
             String title = resultSet.getString(2);

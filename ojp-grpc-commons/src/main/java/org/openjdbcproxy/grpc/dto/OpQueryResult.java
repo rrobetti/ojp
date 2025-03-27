@@ -14,5 +14,12 @@ import java.util.List;
 public class OpQueryResult implements Serializable {
     String resultSetUUID;
     boolean moreData;
+    /**
+     * Labels for each column returned, only populated in the first block of data returned.
+     */
+    List<String> labels;
+    /**
+     * List of rows, each row is an array of objects, each array element is a column of the result set.
+     */
     List<Object[]> rows;
 }

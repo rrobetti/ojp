@@ -12,6 +12,7 @@ import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import io.grpc.stub.StreamObserver;
 import org.apache.commons.collections4.CollectionUtils;
+import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
@@ -37,7 +38,6 @@ import static org.openjdbcproxy.grpc.server.GrpcExceptionHandler.sendSQLExceptio
 
 public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceImplBase {
 
-    private static final int MAX_ROWS_RESULT_SET_FIRST_FETCH = 100;
     //TODO put the datasource at database level not user + database so if more than one user agaist the DB still maintain the max pool size
     private final Map<String, HikariDataSource> datasourceMap = new ConcurrentHashMap<>();
     private final Map<String, ResultSet> resultSetMap = new ConcurrentHashMap<>();
@@ -116,12 +116,12 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                 for (int i = 0; i < params.size(); i++) {
                     this.addParam(i + 1, ps, params.get(i));
                 }
-                String resultSetUUID = this.registerResultSet(ps.executeQuery(), resultsBuilder);
-                this.handleResultSet(resultSetUUID, resultsBuilder);
+                String resultSetUUID = this.registerResultSet(ps.executeQuery());
+                this.handleResultSet(resultSetUUID, resultsBuilder, true);
             } else {
                 Statement stmt = conn.createStatement();
-                String resultSetUUID = this.registerResultSet(stmt.executeQuery(request.getSql()), resultsBuilder);
-                this.handleResultSet(resultSetUUID, resultsBuilder);
+                String resultSetUUID = this.registerResultSet(stmt.executeQuery(request.getSql()));
+                this.handleResultSet(resultSetUUID, resultsBuilder, true);
             }
 
         } catch (SQLException e) {
@@ -137,7 +137,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     public void readResultSetData(ResultSetId resultSetId, StreamObserver<OpResult> responseObserver) {
         OpResult.Builder resultsBuilder = OpResult.newBuilder();
         try {
-            this.handleResultSet(resultSetId.getUuid(), resultsBuilder);
+            this.handleResultSet(resultSetId.getUuid(), resultsBuilder, false);
         } catch (SQLException e) {
             sendSQLExceptionMetadata(e, responseObserver);
         }
@@ -147,19 +147,26 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         responseObserver.onCompleted();
     }
 
-    private String registerResultSet(ResultSet rs, OpResult.Builder resultsBuilder) throws SQLException {
+    private String registerResultSet(ResultSet rs) throws SQLException {
         String resultSetUUID = UUID.randomUUID().toString();
         this.resultSetMap.put(resultSetUUID, rs);//TODO prevent other clients from accessing random result sets, currently there is not protection
         return resultSetUUID;
     }
 
-    private void handleResultSet(String resultSetUUID, OpResult.Builder resultsBuilder) throws SQLException {
+    private void handleResultSet(String resultSetUUID, OpResult.Builder resultsBuilder, boolean firstRead) throws SQLException {
         ResultSet rs = this.resultSetMap.get(resultSetUUID);
         OpQueryResult.OpQueryResultBuilder queryResultBuilder = OpQueryResult.builder();
-        List<Object[]> results = new ArrayList<>();
         int columnCount = rs.getMetaData().getColumnCount();
+        if (firstRead) {
+            List<String> labels = new ArrayList<>();
+            for (int i = 0; i < columnCount; i++) {
+                labels.add(rs.getMetaData().getColumnName(i + 1));
+            }
+            queryResultBuilder.labels(labels);
+        }
+        List<Object[]> results = new ArrayList<>();
         int row = 0;
-        while (row < MAX_ROWS_RESULT_SET_FIRST_FETCH && rs.next()) {
+        while (row < CommonConstants.ROWS_PER_RESULT_SET_DATA_BLOCK && rs.next()) {
             row++;
             Object[] rowValues = new Object[columnCount];
             for (int i = 0; i < columnCount; i++) {
@@ -167,7 +174,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
             results.add(rowValues);
         }
-        boolean moreData = row >= MAX_ROWS_RESULT_SET_FIRST_FETCH;
+        boolean moreData = row >= CommonConstants.ROWS_PER_RESULT_SET_DATA_BLOCK;
         queryResultBuilder.resultSetUUID(resultSetUUID);
         queryResultBuilder.moreData(moreData);
         queryResultBuilder.rows(results);

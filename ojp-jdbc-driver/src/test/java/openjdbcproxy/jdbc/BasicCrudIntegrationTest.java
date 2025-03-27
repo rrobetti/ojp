@@ -1,7 +1,7 @@
 package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -66,6 +66,8 @@ public class BasicCrudIntegrationTest {
         ResultSet resultSetAfterDeletion = psSelect.executeQuery();
         Assert.assertFalse(resultSetAfterDeletion.next());
 
+        resultSet.close();
+        psSelect.close();
         conn.close();
     }
 
