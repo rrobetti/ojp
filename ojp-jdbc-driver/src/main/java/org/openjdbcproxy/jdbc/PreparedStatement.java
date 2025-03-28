@@ -79,7 +79,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
             Parameter.builder()
                     .type(BYTE)
-                    .values(List.of(x))
+                    .values(List.of(new byte[]{x}))//Transform to byte array as it becomes an Object facilitating serialization.
                     .build());
     }
 

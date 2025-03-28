@@ -126,7 +126,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public byte getByte(int columnIndex) throws SQLException {
-        return (byte) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        return ((byte[]) currentDataBlock.get(blockIdx.get())[columnIndex -1])[0];
     }
 
     @Override
@@ -206,7 +206,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public byte getByte(String columnLabel) throws SQLException {
-        return (byte) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return ((byte[]) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())])[0];
     }
 
     @Override

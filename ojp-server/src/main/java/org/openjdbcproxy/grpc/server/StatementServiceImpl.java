@@ -197,6 +197,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case BIG_DECIMAL -> ps.setBigDecimal(idx, (BigDecimal) param.getValues().getFirst());
             case FLOAT -> ps.setFloat(idx, (float) param.getValues().getFirst());
             case BYTES -> ps.setBytes(idx, (byte[]) param.getValues().getFirst());
+            case BYTE -> ps.setByte(idx, ((byte[]) param.getValues().getFirst())[0]);//Comes as an array of bytes with one element.
         }
     }
 
