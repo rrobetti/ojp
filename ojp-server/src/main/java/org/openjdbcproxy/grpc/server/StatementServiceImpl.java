@@ -16,6 +16,7 @@ import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
+import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -78,14 +79,14 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void executeUpdate(StatementRequest request, StreamObserver<OpResult> responseObserver) {
-        int updated = 0;
+        Integer updated = 0;
 
         try (Connection conn = this.datasourceMap.get(request.getContext().getConnHash()).getConnection()) {
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
             if (CollectionUtils.isNotEmpty(params)) {
                 try (PreparedStatement ps = conn.prepareStatement(request.getSql())) {
                     for (int i = 0; i < params.size(); i++) {
-                        this.addParam(i, ps, params.get(i));
+                        this.addParam(i + 1, ps, params.get(i));
                     }
                     updated = ps.executeUpdate();
                 }
@@ -190,6 +191,12 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         switch (param.getType()) {
             case INT -> ps.setInt(idx, (int) param.getValues().getFirst());
             case DOUBLE -> ps.setDouble(idx, (double) param.getValues().getFirst());
+            case STRING -> ps.setString(idx, (String) param.getValues().getFirst());
+            case LONG -> ps.setLong(idx, (long) param.getValues().getFirst());
+            case BOOLEAN -> ps.setBoolean(idx, (boolean) param.getValues().getFirst());
+            case BIG_DECIMAL -> ps.setBigDecimal(idx, (BigDecimal) param.getValues().getFirst());
+            case FLOAT -> ps.setFloat(idx, (float) param.getValues().getFirst());
+            case BYTES -> ps.setBytes(idx, (byte[]) param.getValues().getFirst());
         }
     }
 

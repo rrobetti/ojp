@@ -54,8 +54,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
-        //TODO send the query with all parameters to the remote GRPC server
-        return 0;
+        return this.statementService.executeUpdate(this.ctx, this.sql, this.paramsMap.values().stream().toList());
     }
 
     @Override

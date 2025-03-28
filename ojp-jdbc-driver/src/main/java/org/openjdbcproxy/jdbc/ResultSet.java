@@ -1,5 +1,6 @@
 package org.openjdbcproxy.jdbc;
 
+import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
@@ -30,6 +31,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+@Slf4j
 public class ResultSet implements java.sql.ResultSet {
 
     private final String resultSetUUID;
@@ -71,6 +73,7 @@ public class ResultSet implements java.sql.ResultSet {
                             throw fetchBlockResult.getException();
                         }
                         this.currentDataBlock = fetchBlockResult.getResult().getRows();
+                        this.cfNextDataBlock = null;
                         this.blockCount.incrementAndGet();
                         this.moreData = fetchBlockResult.getResult().isMoreData();
                     } catch (InterruptedException | ExecutionException e) {

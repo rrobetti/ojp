@@ -41,7 +41,7 @@ public class MultipleTypesIntegrationTest {
                          val_binary           BINARY)
                 """);
 
-        /*java.sql.PreparedStatement psInsert = conn.prepareStatement(
+        java.sql.PreparedStatement psInsert = conn.prepareStatement(
                 """
                     insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint,
                     val_smallint, val_boolean, val_decimal, val_float, val_binary)
@@ -50,16 +50,16 @@ public class MultipleTypesIntegrationTest {
         );
 
         psInsert.setInt(1, 1);
-        psInsert.setString(2, "TITLE_1");*/
-
-
-        this.executeUpdate(conn,
-                """
-                    insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint,
-                    val_smallint, val_boolean, val_decimal, val_float, val_binary)
-                    values (1, 'TITLE_1', 2.2222, 33333333333333, 127, 32767, 1, 10, 20.20, X'10')
-                    """
-        );
+        psInsert.setString(2, "TITLE_1");
+        psInsert.setDouble(3, 2.2222d);
+        psInsert.setLong(4, 33333333333333l);
+        psInsert.setInt(5, 127);
+        psInsert.setInt(6, 32767);
+        psInsert.setBoolean(7, true);
+        psInsert.setBigDecimal(8, new BigDecimal(10));
+        psInsert.setFloat(9, 20.20f);
+        psInsert.setBytes(10, "A".getBytes());
+        psInsert.executeUpdate();
 
         java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table where val_int = ?");
         psSelect.setInt(1, 1);
@@ -74,7 +74,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals(true, resultSet.getBoolean(7));
         Assert.assertEquals(new BigDecimal(10), resultSet.getBigDecimal(8));
         Assert.assertEquals(20.20f+"", ""+resultSet.getFloat(9));
-        Assert.assertEquals(""+resultSet.getBytes("val_binary"), ""+resultSet.getBytes(10));
+        Assert.assertEquals("A", new String(resultSet.getBytes(10)));
 
         Assert.assertEquals(1, resultSet.getInt("val_int"));
         Assert.assertEquals("TITLE_1", resultSet.getString("val_varchar"));
@@ -85,6 +85,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals(new BigDecimal(10), resultSet.getBigDecimal("val_decimal"));
         Assert.assertEquals(20.20f+"", ""+resultSet.getFloat("val_float"));
         Assert.assertEquals(true, resultSet.getBoolean("val_boolean"));
+        Assert.assertEquals("A", new String(resultSet.getBytes("val_binary")));
 
         executeUpdate(conn,
                 """
