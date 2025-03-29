@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
+import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
@@ -45,14 +46,16 @@ public class MultipleTypesIntegrationTest {
                          val_byte             BINARY,
                          val_binary           BINARY(4),
                          val_date             DATE,
-                         val_time             TIME)
+                         val_time             TIME,
+                         val_timestamp        TIMESTAMP)
                 """);
 
         java.sql.PreparedStatement psInsert = conn.prepareStatement(
                 """
                     insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint,
-                    val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary, val_date, val_time)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary, val_date, val_time,
+                    val_timestamp)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
         );
 
@@ -71,6 +74,8 @@ public class MultipleTypesIntegrationTest {
         psInsert.setDate(12, new Date(sdf.parse("29/03/2025").getTime()));
         SimpleDateFormat sdfTime = new SimpleDateFormat("hh:mm:ss");
         psInsert.setTime(13, new Time(sdfTime.parse("11:12:13").getTime()));
+        SimpleDateFormat sdfTimestamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+        psInsert.setTimestamp(14, new Timestamp(sdfTimestamp.parse("30/03/2025 21:22:23").getTime()));
         psInsert.executeUpdate();
 
         java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table where val_int = ?");
@@ -90,6 +95,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals("AAAA", new String(resultSet.getBytes(11)));
         Assert.assertEquals("29/03/2025", sdf.format(resultSet.getDate(12)));
         Assert.assertEquals("11:12:13", sdfTime.format(resultSet.getTime(13)));
+        Assert.assertEquals("30/03/2025 21:22:23", sdfTimestamp.format(resultSet.getTimestamp(14)));
 
         Assert.assertEquals(1, resultSet.getInt("val_int"));
         Assert.assertEquals("TITLE_1", resultSet.getString("val_varchar"));
@@ -104,6 +110,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals("AAAA", new String(resultSet.getBytes("val_binary")));
         Assert.assertEquals("29/03/2025", sdf.format(resultSet.getDate("val_date")));
         Assert.assertEquals("11:12:13", sdfTime.format(resultSet.getTime("val_time")));
+        Assert.assertEquals("30/03/2025 21:22:23", sdfTimestamp.format(resultSet.getTimestamp("val_timestamp")));
 
         executeUpdate(conn,
                 """

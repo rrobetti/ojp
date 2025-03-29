@@ -25,6 +25,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Time;
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -202,6 +203,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case BYTE -> ps.setByte(idx, ((byte[]) param.getValues().getFirst())[0]);//Comes as an array of bytes with one element.
             case DATE -> ps.setDate(idx, (Date) param.getValues().getFirst());
             case TIME -> ps.setTime(idx, (Time) param.getValues().getFirst());
+            case TIMESTAMP -> ps.setTimestamp(idx, (Timestamp) param.getValues().getFirst());
         }
     }
 
