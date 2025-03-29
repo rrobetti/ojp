@@ -19,6 +19,7 @@ import org.openjdbcproxy.grpc.dto.Parameter;
 import java.math.BigDecimal;
 import java.security.MessageDigest;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -198,6 +199,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case FLOAT -> ps.setFloat(idx, (float) param.getValues().getFirst());
             case BYTES -> ps.setBytes(idx, (byte[]) param.getValues().getFirst());
             case BYTE -> ps.setByte(idx, ((byte[]) param.getValues().getFirst())[0]);//Comes as an array of bytes with one element.
+            case DATE -> ps.setDate(idx, (Date) param.getValues().getFirst());
         }
     }
 
