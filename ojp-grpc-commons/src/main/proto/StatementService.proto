@@ -43,6 +43,5 @@ message SqlErrorResponse {
 service StatementService {
     rpc connect(ConnectionDetails) returns (OpContext);
     rpc executeUpdate(StatementRequest) returns (OpResult);
-    rpc executeQuery(StatementRequest) returns (OpResult);
-    rpc readResultSetData(ResultSetId) returns (OpResult);
+    rpc executeQuery(StatementRequest) returns (stream OpResult);
 }

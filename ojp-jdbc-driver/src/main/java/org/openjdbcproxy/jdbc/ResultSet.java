@@ -1,5 +1,7 @@
 package org.openjdbcproxy.jdbc;
 
+import com.openjdbcproxy.grpc.OpResult;
+import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
@@ -24,6 +26,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -31,76 +34,55 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
+import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
+
 @Slf4j
 public class ResultSet implements java.sql.ResultSet {
 
-    private final String resultSetUUID;
     private final Map<String, Integer> labelsMap;
     private final StatementService statementService;
 
+    private Iterator<OpResult> itResults;
     private List<Object[]> currentDataBlock;
-    private CompletableFuture<FetchBlockResult> cfNextDataBlock;// Data fetched ahead of time for performance
     private AtomicInteger blockIdx = new AtomicInteger(-1);
     private AtomicInteger blockCount = new AtomicInteger(1);
-    private boolean moreData;
+    //private boolean moreData;
 
-    public ResultSet(OpQueryResult queryResult, StatementService statementService, List<Object[]> currentDataBlock) {
-        this.statementService = statementService;
-        this.currentDataBlock = currentDataBlock;
-        this.resultSetUUID = queryResult.getResultSetUUID();
-        this.moreData = queryResult.isMoreData();
-        this.labelsMap = new HashMap<>();
-        List<String> labels = queryResult.getLabels();
-        for (int i = 0; i < labels.size(); i++) {
-            labelsMap.put(labels.get(i).toUpperCase(), i);
+    public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService) throws SQLException {
+        this.itResults = itOpResult;
+        try {
+            OpResult result = itOpResult.next();
+            OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
+
+            this.statementService = statementService;
+            this.currentDataBlock = opQueryResult.getRows();
+            this.labelsMap = new HashMap<>();
+            List<String> labels = opQueryResult.getLabels();
+            for (int i = 0; i < labels.size(); i++) {
+                labelsMap.put(labels.get(i).toUpperCase(), i);
+            }
+        } catch (StatusRuntimeException e) {
+            throw handle(e);
         }
     }
 
     @Override
     public boolean next() throws SQLException {
-        int incrementedIndex = blockIdx.incrementAndGet();
-        if (this.moreData) {
-            if (incrementedIndex == 1) { //1 because in the first block it starts at 0, second block on reaches here as 1 because 0 already got processed
-                synchronized(this) {
-                    this.fetchNextDataBlockAsync();
-                }
-            } else if (incrementedIndex == this.currentDataBlock.size()) {
-                synchronized(this) {
-                    try {
-                        System.out.println("Moving from current block to the next");
-                        FetchBlockResult fetchBlockResult = this.cfNextDataBlock.orTimeout(10, TimeUnit.SECONDS).get();
-                        if (fetchBlockResult.getException() != null) {
-                            throw fetchBlockResult.getException();
-                        }
-                        this.currentDataBlock = fetchBlockResult.getResult().getRows();
-                        this.cfNextDataBlock = null;
-                        this.blockCount.incrementAndGet();
-                        this.moreData = fetchBlockResult.getResult().isMoreData();
-                    } catch (InterruptedException | ExecutionException e) {
-                        throw new RuntimeException(e);
-                    }
-                    this.cfNextDataBlock = null;
-                    this.blockIdx.set(0);
-                }
+        blockIdx.incrementAndGet();
+        if (blockIdx.get() >= currentDataBlock.size() && itResults.hasNext()) {
+            try {
+                OpResult result = itResults.next();
+                OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
+                this.currentDataBlock = opQueryResult.getRows();
+                this.blockCount.incrementAndGet();
+                this.blockIdx.set(0);
+            } catch (StatusRuntimeException e) {
+                throw handle(e);
             }
         }
-        return incrementedIndex < currentDataBlock.size();
-    }
 
-    private void fetchNextDataBlockAsync() {
-        System.out.println("Fetching the next block of data");
-        this.cfNextDataBlock = CompletableFuture.supplyAsync(() -> {
-            FetchBlockResult.FetchBlockResultBuilder fetchBlockResultBuilder = FetchBlockResult.builder();
-            OpQueryResult result = null;
-            try {
-                result = this.statementService.readResultSetData(this.resultSetUUID);
-                fetchBlockResultBuilder.result(result);
-                System.out.println("Next block of data received");
-            } catch (SQLException e) {
-                fetchBlockResultBuilder.exception(e);
-            }
-            return  fetchBlockResultBuilder.build();
-        });
+        return blockIdx.get() < currentDataBlock.size();
     }
 
     @Override
@@ -336,7 +318,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public boolean isAfterLast() throws SQLException {
-        return !this.moreData && blockIdx.get() >= currentDataBlock.size();
+        return !itResults.hasNext() && blockIdx.get() >= currentDataBlock.size();
     }
 
     @Override
@@ -346,7 +328,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public boolean isLast() throws SQLException {
-        return !this.moreData && blockIdx.get() == (currentDataBlock.size() - 1);
+        return !itResults.hasNext() && blockIdx.get() == (currentDataBlock.size() - 1);
     }
 
     @Override

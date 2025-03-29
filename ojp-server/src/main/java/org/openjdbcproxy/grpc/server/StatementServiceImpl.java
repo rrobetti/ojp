@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.OpContext;
 import com.openjdbcproxy.grpc.OpResult;
-import com.openjdbcproxy.grpc.ResultSetId;
 import com.openjdbcproxy.grpc.ResultType;
 import com.openjdbcproxy.grpc.StatementRequest;
 import com.openjdbcproxy.grpc.StatementServiceGrpc;
@@ -109,7 +108,6 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void executeQuery(StatementRequest request, StreamObserver<OpResult> responseObserver) {
-        OpResult.Builder resultsBuilder = OpResult.newBuilder();
 
         try {
             Connection conn = this.datasourceMap.get(request.getContext().getConnHash()).getConnection();
@@ -121,34 +119,16 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                     this.addParam(i + 1, ps, params.get(i));
                 }
                 String resultSetUUID = this.registerResultSet(ps.executeQuery());
-                this.handleResultSet(resultSetUUID, resultsBuilder, true);
+                this.handleResultSet(resultSetUUID, responseObserver);
             } else {
                 Statement stmt = conn.createStatement();
                 String resultSetUUID = this.registerResultSet(stmt.executeQuery(request.getSql()));
-                this.handleResultSet(resultSetUUID, resultsBuilder, true);
+                this.handleResultSet(resultSetUUID, responseObserver);
             }
 
         } catch (SQLException e) {
             sendSQLExceptionMetadata(e, responseObserver);
         }
-
-        resultsBuilder.setType(ResultType.RESULT_SET);
-        responseObserver.onNext(resultsBuilder.build());
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    public void readResultSetData(ResultSetId resultSetId, StreamObserver<OpResult> responseObserver) {
-        OpResult.Builder resultsBuilder = OpResult.newBuilder();
-        try {
-            this.handleResultSet(resultSetId.getUuid(), resultsBuilder, false);
-        } catch (SQLException e) {
-            sendSQLExceptionMetadata(e, responseObserver);
-        }
-
-        resultsBuilder.setType(ResultType.RESULT_SET);
-        responseObserver.onNext(resultsBuilder.build());
-        responseObserver.onCompleted();
     }
 
     private String registerResultSet(ResultSet rs) throws SQLException {
@@ -157,37 +137,59 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         return resultSetUUID;
     }
 
-    private void handleResultSet(String resultSetUUID, OpResult.Builder resultsBuilder, boolean firstRead) throws SQLException {
+    private void handleResultSet(String resultSetUUID, StreamObserver<OpResult> responseObserver)
+            throws SQLException {
         ResultSet rs = this.resultSetMap.get(resultSetUUID);
         OpQueryResult.OpQueryResultBuilder queryResultBuilder = OpQueryResult.builder();
         int columnCount = rs.getMetaData().getColumnCount();
-        if (firstRead) {
-            List<String> labels = new ArrayList<>();
-            for (int i = 0; i < columnCount; i++) {
-                labels.add(rs.getMetaData().getColumnName(i + 1));
-            }
-            queryResultBuilder.labels(labels);
+        List<String> labels = new ArrayList<>();
+        for (int i = 0; i < columnCount; i++) {
+            labels.add(rs.getMetaData().getColumnName(i + 1));
         }
+        queryResultBuilder.labels(labels);
+
         List<Object[]> results = new ArrayList<>();
         int row = 0;
-        while (row < CommonConstants.ROWS_PER_RESULT_SET_DATA_BLOCK && rs.next()) {
+        boolean justSent = false;
+        while (rs.next()) {
+            justSent = false;
             row++;
             Object[] rowValues = new Object[columnCount];
             for (int i = 0; i < columnCount; i++) {
                 rowValues[i] = rs.getObject(i + 1);
             }
             results.add(rowValues);
+
+            if (row % CommonConstants.ROWS_PER_RESULT_SET_DATA_BLOCK == 0) {
+                justSent = true;
+                //Send a block of records
+                responseObserver.onNext(this.wrapResults(results, queryResultBuilder, resultSetUUID));
+                queryResultBuilder = OpQueryResult.builder();// Recreate the builder to not send labels in every block.
+                results = new ArrayList<>();
+            }
         }
-        boolean moreData = row >= CommonConstants.ROWS_PER_RESULT_SET_DATA_BLOCK;
+
+        if (!justSent) {
+            //Send a block of remaining records
+            responseObserver.onNext(this.wrapResults(results, queryResultBuilder, resultSetUUID));
+        }
+
+        responseObserver.onCompleted();
+
+        // TODO close should come from the client when the client close these objects.
+        rs.close();
+        rs.getStatement().close();
+        rs.getStatement().getConnection().close();
+    }
+
+    private OpResult wrapResults(List<Object[]> results, OpQueryResult.OpQueryResultBuilder queryResultBuilder,
+                                 String resultSetUUID) {
+        OpResult.Builder resultsBuilder = OpResult.newBuilder();
+        resultsBuilder.setType(ResultType.RESULT_SET);
         queryResultBuilder.resultSetUUID(resultSetUUID);
-        queryResultBuilder.moreData(moreData);
         queryResultBuilder.rows(results);
         resultsBuilder.setValue(ByteString.copyFrom(serialize(queryResultBuilder.build())));
-        if (!moreData) {// TODO close should come from the client when the client close these objects.
-            rs.close();
-            rs.getStatement().close();
-            rs.getStatement().getConnection().close();
-        }
+        return resultsBuilder.build();
     }
 
     private void addParam(int idx, PreparedStatement ps, Parameter param) throws SQLException {

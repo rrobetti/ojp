@@ -13,7 +13,6 @@ import java.util.List;
 @Getter
 public class OpQueryResult implements Serializable {
     String resultSetUUID;
-    boolean moreData;
     /**
      * Labels for each column returned, only populated in the first block of data returned.
      */

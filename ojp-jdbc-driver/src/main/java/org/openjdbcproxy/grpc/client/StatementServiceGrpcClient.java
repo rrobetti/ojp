@@ -4,19 +4,16 @@ import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.OpContext;
 import com.openjdbcproxy.grpc.OpResult;
-import com.openjdbcproxy.grpc.ResultSetId;
 import com.openjdbcproxy.grpc.StatementRequest;
 import com.openjdbcproxy.grpc.StatementServiceGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
-import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
-import java.io.IOException;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
@@ -59,21 +56,10 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public OpQueryResult executeQuery(OpContext ctx, String sql, List<Parameter> params) throws SQLException {
+    public Iterator<OpResult> executeQuery(OpContext ctx, String sql, List<Parameter> params) throws SQLException {
         try {
-            OpResult result = this.statemetServiceStub.executeQuery(StatementRequest.newBuilder()
+             return this.statemetServiceStub.executeQuery(StatementRequest.newBuilder()
                     .setContext(ctx).setSql(sql).setParameters(ByteString.copyFrom(serialize(params))).build());
-            return deserialize(result.getValue().toByteArray(), OpQueryResult.class);
-        } catch (StatusRuntimeException e) {
-            throw handle(e);
-        }
-    }
-
-    @Override
-    public OpQueryResult readResultSetData(String resultSetUUID) throws SQLException {
-        try {
-            OpResult result = this.statemetServiceStub.readResultSetData(ResultSetId.newBuilder().setUuid(resultSetUUID).build());
-            return deserialize(result.getValue().toByteArray(), OpQueryResult.class);
         } catch (StatusRuntimeException e) {
             throw handle(e);
         }

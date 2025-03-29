@@ -25,6 +25,7 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.Iterator;
 import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -47,9 +48,9 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public ResultSet executeQuery() throws SQLException {
-        OpQueryResult queryResult = this.statementService
+        Iterator<OpResult> itOpResult = this.statementService
                 .executeQuery(this.ctx, this.sql, this.paramsMap.values().stream().toList());
-        return new ResultSet(queryResult, this.statementService, queryResult.getRows());
+        return new ResultSet(itOpResult, this.statementService);
     }
 
     @Override

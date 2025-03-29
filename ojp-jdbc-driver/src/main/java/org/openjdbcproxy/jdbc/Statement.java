@@ -1,11 +1,13 @@
 package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.OpContext;
+import com.openjdbcproxy.grpc.OpResult;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 
 import java.sql.SQLException;
 import java.sql.SQLWarning;
+import java.util.Iterator;
 
 import static org.openjdbcproxy.jdbc.Constants.EMPTY_PARAMETERS_LIST;
 
@@ -21,8 +23,8 @@ public class Statement implements java.sql.Statement {
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
-        OpQueryResult queryResult = this.statementService.executeQuery(this.ctx, sql, EMPTY_PARAMETERS_LIST);
-        return new ResultSet(queryResult, this.statementService, queryResult.getRows());
+        Iterator<OpResult> itResults = this.statementService.executeQuery(this.ctx, sql, EMPTY_PARAMETERS_LIST);
+        return new ResultSet(itResults, this.statementService);
     }
 
     @Override
