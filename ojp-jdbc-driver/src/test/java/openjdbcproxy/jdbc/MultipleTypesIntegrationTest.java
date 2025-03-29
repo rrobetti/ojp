@@ -5,15 +5,18 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 
 public class MultipleTypesIntegrationTest {
 
     @Test
-    public void typesCoverageTestSuccessful() throws SQLException, ClassNotFoundException {
+    public void typesCoverageTestSuccessful() throws SQLException, ClassNotFoundException, ParseException {
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
@@ -39,14 +42,15 @@ public class MultipleTypesIntegrationTest {
                          val_decimal          DECIMAL,
                          val_float            FLOAT(2),
                          val_byte             BINARY,
-                         val_binary           BINARY(4))
+                         val_binary           BINARY(4),
+                         val_date             DATE)
                 """);
 
         java.sql.PreparedStatement psInsert = conn.prepareStatement(
                 """
                     insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint,
-                    val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary, val_date)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """
         );
 
@@ -61,6 +65,8 @@ public class MultipleTypesIntegrationTest {
         psInsert.setFloat(9, 20.20f);
         psInsert.setByte(10, (byte) 1);
         psInsert.setBytes(11, "AAAA".getBytes());
+        SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy");
+        psInsert.setDate(12, new Date(sdf.parse("29/03/2025").getTime()));
         psInsert.executeUpdate();
 
         java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table where val_int = ?");
@@ -78,6 +84,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals(20.20f+"", ""+resultSet.getFloat(9));
         Assert.assertEquals((byte) 1, resultSet.getByte(10));
         Assert.assertEquals("AAAA", new String(resultSet.getBytes(11)));
+        Assert.assertEquals("29/03/2025", sdf.format(resultSet.getDate(12)));
 
         Assert.assertEquals(1, resultSet.getInt("val_int"));
         Assert.assertEquals("TITLE_1", resultSet.getString("val_varchar"));
@@ -90,6 +97,7 @@ public class MultipleTypesIntegrationTest {
         Assert.assertEquals(true, resultSet.getBoolean("val_boolean"));
         Assert.assertEquals((byte) 1, resultSet.getByte("val_byte"));
         Assert.assertEquals("AAAA", new String(resultSet.getBytes("val_binary")));
+        Assert.assertEquals("29/03/2025", sdf.format(resultSet.getDate("val_date")));
 
         executeUpdate(conn,
                 """
