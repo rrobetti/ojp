@@ -204,6 +204,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case DATE -> ps.setDate(idx, (Date) param.getValues().getFirst());
             case TIME -> ps.setTime(idx, (Time) param.getValues().getFirst());
             case TIMESTAMP -> ps.setTimestamp(idx, (Timestamp) param.getValues().getFirst());
+            default -> ps.setObject(idx, param.getValues().getFirst());
         }
     }
 
