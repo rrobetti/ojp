@@ -1,9 +1,10 @@
 package org.openjdbcproxy.grpc.client;
 
 import com.openjdbcproxy.grpc.ConnectionDetails;
-import com.openjdbcproxy.grpc.OpContext;
+import com.openjdbcproxy.grpc.LobDataBlock;
+import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.OpResult;
-import org.openjdbcproxy.grpc.dto.OpQueryResult;
+import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
 import java.sql.SQLException;
@@ -18,7 +19,9 @@ public interface StatementService {
     /**
      * Open a new JDBC connection with the database if one does not yet exit.
      */
-    OpContext connect(ConnectionDetails connectionDetails) throws SQLException;
-    Integer executeUpdate(OpContext ctx, String sql, List<Parameter> params) throws SQLException;
-    Iterator<OpResult> executeQuery(OpContext ctx, String sql, List<Parameter> params) throws SQLException;
+    SessionInfo connect(ConnectionDetails connectionDetails) throws SQLException;
+    Integer executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException;
+    Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException;
+    LobReference createLob(Iterator<LobDataBlock> lobDataBlock) throws SQLException;
+    Iterator<LobDataBlock> readLob(LobReference lobReference, long pos, int length) throws SQLException;
 }

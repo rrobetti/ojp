@@ -1,7 +1,7 @@
 package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.ConnectionDetails;
-import com.openjdbcproxy.grpc.OpContext;
+import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.client.StatementServiceGrpcClient;
 
@@ -25,7 +25,6 @@ public class Driver implements java.sql.Driver {
         }
     }
 
-    private OpContext ctx;
     private final StatementService statementService;
 
     public Driver(StatementService statementService) {
@@ -34,12 +33,16 @@ public class Driver implements java.sql.Driver {
 
     @Override
     public java.sql.Connection connect(String url, Properties info) throws SQLException {
-        OpContext ctx = this.statementService
-                .connect(ConnectionDetails.newBuilder().setUrl(url).setUser((String) info.get(USER))
-                        .setPassword((String) info.get(PASSWORD)).build());
-        this.ctx = ctx;
+        SessionInfo sessionInfo = this.statementService
+                .connect(ConnectionDetails.newBuilder()
+                        .setUrl(url)
+                        .setUser((String) info.get(USER))
+                        .setPassword((String) info.get(PASSWORD))
+                        .setClientUUID(ClientUUID.getUUID())
+                        .build()
+                );
         //TODO create centralized handling of exceptions returned that coverts automatically to SQLException.
-        return new Connection(this.ctx, this.statementService);
+        return new Connection(sessionInfo, this.statementService);
     }
 
     @Override

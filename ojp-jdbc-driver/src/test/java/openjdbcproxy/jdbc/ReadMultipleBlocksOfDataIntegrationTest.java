@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class ReadMultiplePagesOfDataIntegrationTest {
+public class ReadMultipleBlocksOfDataIntegrationTest {
 
     @ParameterizedTest
     @ValueSource(ints = {1,99,100,101,1000,10000})

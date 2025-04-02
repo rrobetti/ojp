@@ -13,7 +13,7 @@ import java.sql.SQLException;
  */
 public class GrpcExceptionHandler {
     /**
-     * Handles the reporting or SQLExcptions.
+     * Handles the reporting or SQLExceptions.
      * @param e SQLException
      * @param streamObserver target stream observer.
      * @param <T> Stream observer generic type.

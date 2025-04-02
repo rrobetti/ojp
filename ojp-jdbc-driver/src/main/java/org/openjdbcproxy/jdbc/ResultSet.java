@@ -1,6 +1,8 @@
 package org.openjdbcproxy.jdbc;
 
+import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.OpResult;
+import com.openjdbcproxy.grpc.SessionInfo;
 import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
@@ -29,9 +31,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
@@ -47,11 +46,12 @@ public class ResultSet implements java.sql.ResultSet {
     private List<Object[]> currentDataBlock;
     private AtomicInteger blockIdx = new AtomicInteger(-1);
     private AtomicInteger blockCount = new AtomicInteger(1);
-    //private boolean moreData;
+    private java.sql.Statement statement;
 
-    public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService) throws SQLException {
+    public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService, java.sql.Statement statement) throws SQLException {
         this.itResults = itOpResult;
         try {
+            this.statement = statement;
             OpResult result = itOpResult.next();
             OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
 
@@ -642,8 +642,8 @@ public class ResultSet implements java.sql.ResultSet {
     }
 
     @Override
-    public Statement getStatement() throws SQLException {
-        throw new RuntimeException("Not implemented");
+    public java.sql.Statement getStatement() throws SQLException {
+        return this.statement;
     }
 
     @Override
@@ -658,7 +658,15 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public Blob getBlob(int columnIndex) throws SQLException {
-        throw new RuntimeException("Not implemented");
+        String blobRefUUID = (String) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        return new org.openjdbcproxy.jdbc.Blob((Connection) this.statement.getConnection(),
+                new LobServiceImpl((Connection) this.statement.getConnection(), this.statementService),
+                this.statementService,
+                LobReference.newBuilder()
+                        .setSession(((Connection) this.statement.getConnection()).getSession())
+                        .setUuid(blobRefUUID)
+                        .build()
+        );
     }
 
     @Override

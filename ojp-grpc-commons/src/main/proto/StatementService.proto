@@ -6,11 +6,14 @@ message ConnectionDetails {
     string url = 1;
     string user = 2;
     string password = 3;
+    string clientUUID = 4;
 }
 
-message OpContext {
+message SessionInfo {
     string connHash = 1;
     string clientUUID = 2;
+    //only set if connection has to be the same among different requests, within transaction boundaries or when using LOB objects.
+    string connectionUUID = 3;
 }
 
 message ResultSetId {
@@ -22,13 +25,19 @@ enum ResultType {
     RESULT_SET = 1;
 }
 
+enum LobType {
+    BINARY = 0;
+    CHARACTER = 1;
+}
+
 message OpResult {
-    ResultType type = 1;
-    bytes value = 2;
+    SessionInfo session = 1;
+    ResultType type = 2;
+    bytes value = 3;
 }
 
 message StatementRequest {
-    OpContext context = 1;
+    SessionInfo session = 1;
     string sql = 2;
     bytes parameters = 3;
 }
@@ -39,9 +48,28 @@ message SqlErrorResponse {
     int32 vendorCode = 3;
 }
 
+message LobReference {
+    SessionInfo session = 1;
+    string uuid = 2;
+    int32 bytesWritten = 3;
+}
+
+message ReadLobRequest {
+    LobReference lobReference = 1;
+    int64 position = 2;
+    int32 length = 3;
+}
+
+message LobDataBlock {
+    SessionInfo session = 1;
+    int64 position = 2;
+    bytes data = 3;
+}
 
 service StatementService {
-    rpc connect(ConnectionDetails) returns (OpContext);
+    rpc connect(ConnectionDetails) returns (SessionInfo);
     rpc executeUpdate(StatementRequest) returns (OpResult);
     rpc executeQuery(StatementRequest) returns (stream OpResult);
+    rpc createLob(stream LobDataBlock) returns (stream LobReference);
+    rpc readLob(ReadLobRequest) returns (stream LobDataBlock);
 }

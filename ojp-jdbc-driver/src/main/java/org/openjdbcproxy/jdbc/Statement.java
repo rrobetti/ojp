@@ -1,9 +1,8 @@
 package org.openjdbcproxy.jdbc;
 
-import com.openjdbcproxy.grpc.OpContext;
 import com.openjdbcproxy.grpc.OpResult;
+import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.client.StatementService;
-import org.openjdbcproxy.grpc.dto.OpQueryResult;
 
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -13,23 +12,23 @@ import static org.openjdbcproxy.jdbc.Constants.EMPTY_PARAMETERS_LIST;
 
 public class Statement implements java.sql.Statement {
 
-    private final OpContext ctx;
+    private final Connection connection;
     private final StatementService statementService;
 
-    public Statement(OpContext ctx, StatementService statementService) {
-        this.ctx = ctx;
+    public Statement(Connection connection, StatementService statementService) {
+        this.connection = connection;
         this.statementService = statementService;
     }
 
     @Override
     public ResultSet executeQuery(String sql) throws SQLException {
-        Iterator<OpResult> itResults = this.statementService.executeQuery(this.ctx, sql, EMPTY_PARAMETERS_LIST);
-        return new ResultSet(itResults, this.statementService);
+        Iterator<OpResult> itResults = this.statementService.executeQuery(this.connection.getSession(), sql, EMPTY_PARAMETERS_LIST);
+        return new ResultSet(itResults, this.statementService, this);
     }
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
-        return this.statementService.executeUpdate(this.ctx, sql, EMPTY_PARAMETERS_LIST);
+        return this.statementService.executeUpdate(this.connection.getSession(), sql, EMPTY_PARAMETERS_LIST);
     }
 
     @Override
@@ -159,7 +158,7 @@ public class Statement implements java.sql.Statement {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return null;
+        return this.connection;
     }
 
     @Override

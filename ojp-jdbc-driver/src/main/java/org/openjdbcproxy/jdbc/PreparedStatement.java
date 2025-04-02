@@ -1,9 +1,8 @@
 package org.openjdbcproxy.jdbc;
 
-import com.openjdbcproxy.grpc.OpContext;
 import com.openjdbcproxy.grpc.OpResult;
+import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.client.StatementService;
-import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
 import java.io.InputStream;
@@ -30,17 +29,44 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
-import static org.openjdbcproxy.grpc.dto.ParameterType.*;
-import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
+import static org.openjdbcproxy.grpc.dto.ParameterType.ARRAY;
+import static org.openjdbcproxy.grpc.dto.ParameterType.ASCII_STREAM;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BIG_DECIMAL;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BINARY_STREAM;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BLOB;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BOOLEAN;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BYTE;
+import static org.openjdbcproxy.grpc.dto.ParameterType.BYTES;
+import static org.openjdbcproxy.grpc.dto.ParameterType.CHARACTER_READER;
+import static org.openjdbcproxy.grpc.dto.ParameterType.CLOB;
+import static org.openjdbcproxy.grpc.dto.ParameterType.DATE;
+import static org.openjdbcproxy.grpc.dto.ParameterType.DOUBLE;
+import static org.openjdbcproxy.grpc.dto.ParameterType.FLOAT;
+import static org.openjdbcproxy.grpc.dto.ParameterType.INT;
+import static org.openjdbcproxy.grpc.dto.ParameterType.LONG;
+import static org.openjdbcproxy.grpc.dto.ParameterType.NULL;
+import static org.openjdbcproxy.grpc.dto.ParameterType.N_CHARACTER_STREAM;
+import static org.openjdbcproxy.grpc.dto.ParameterType.N_CLOB;
+import static org.openjdbcproxy.grpc.dto.ParameterType.N_STRING;
+import static org.openjdbcproxy.grpc.dto.ParameterType.OBJECT;
+import static org.openjdbcproxy.grpc.dto.ParameterType.REF;
+import static org.openjdbcproxy.grpc.dto.ParameterType.ROW_ID;
+import static org.openjdbcproxy.grpc.dto.ParameterType.SHORT;
+import static org.openjdbcproxy.grpc.dto.ParameterType.SQL_XML;
+import static org.openjdbcproxy.grpc.dto.ParameterType.STRING;
+import static org.openjdbcproxy.grpc.dto.ParameterType.TIME;
+import static org.openjdbcproxy.grpc.dto.ParameterType.TIMESTAMP;
+import static org.openjdbcproxy.grpc.dto.ParameterType.UNICODE_STREAM;
+import static org.openjdbcproxy.grpc.dto.ParameterType.URL;
 
 public class PreparedStatement implements java.sql.PreparedStatement {
-    private final OpContext ctx;
+    private final Connection connection;
     private String sql;
     private SortedMap<Integer, Parameter> paramsMap;
     private StatementService statementService;
 
-    public PreparedStatement(OpContext ctx, String sql, StatementService statementService) {
-        this.ctx = ctx;
+    public PreparedStatement(Connection connection, String sql, StatementService statementService) {
+        this.connection = connection;
         this.sql = sql;
         this.paramsMap = new TreeMap<>();
         this.statementService = statementService;
@@ -49,13 +75,13 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public ResultSet executeQuery() throws SQLException {
         Iterator<OpResult> itOpResult = this.statementService
-                .executeQuery(this.ctx, this.sql, this.paramsMap.values().stream().toList());
-        return new ResultSet(itOpResult, this.statementService);
+                .executeQuery(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList());
+        return new ResultSet(itOpResult, this.statementService, this);
     }
 
     @Override
     public int executeUpdate() throws SQLException {
-        return this.statementService.executeUpdate(this.ctx, this.sql, this.paramsMap.values().stream().toList());
+        return this.statementService.executeUpdate(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList());
     }
 
     @Override
@@ -261,10 +287,11 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, Blob x) throws SQLException {
+        String blobUUID = ((org.openjdbcproxy.jdbc.Blob) x).getUUID();
         this.paramsMap.put(parameterIndex,
             Parameter.builder()
                     .type(BLOB)
-                    .values(List.of(x))
+                    .values(List.of(blobUUID)) //Only send the Id as per the blob has been streamed in advance.
                     .build());
     }
 
@@ -621,7 +648,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public Connection getConnection() throws SQLException {
-        return null;
+        return this.connection;
     }
 
     @Override

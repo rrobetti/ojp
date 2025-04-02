@@ -1,9 +1,10 @@
 package org.openjdbcproxy.jdbc;
 
-import com.openjdbcproxy.grpc.OpContext;
+import com.openjdbcproxy.grpc.SessionInfo;
+import lombok.Getter;
+import lombok.Setter;
 import org.openjdbcproxy.grpc.client.StatementService;
 
-import java.io.IOException;
 import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
@@ -22,22 +23,24 @@ import java.util.concurrent.Executor;
 
 public class Connection implements java.sql.Connection {
 
-    private final OpContext ctx;
+    @Getter
+    @Setter
+    private SessionInfo session;
     private final StatementService statementService;
 
-    public Connection(OpContext ctx, StatementService statementService) {
-        this.ctx = ctx;
+    public Connection(SessionInfo session, StatementService statementService) {
+        this.session = session;
         this.statementService = statementService;
     }
 
     @Override
     public java.sql.Statement createStatement() throws SQLException {
-        return new Statement(this.ctx, statementService);
+        return new Statement(this, statementService);
     }
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql) throws SQLException {
-        return new PreparedStatement(this.ctx, sql, this.statementService);
+        return new PreparedStatement(this, sql, this.statementService);
     }
 
     @Override
@@ -216,7 +219,8 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public Blob createBlob() throws SQLException {
-        return null;
+        return new org.openjdbcproxy.jdbc.Blob(this, new LobServiceImpl(this, this.statementService),
+                this.statementService);
     }
 
     @Override
