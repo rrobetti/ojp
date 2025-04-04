@@ -5,9 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.openjdbcproxy.jdbc.Constants;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UnsupportedEncodingException;
 import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -19,7 +19,7 @@ import java.sql.Statement;
 public class BLOBIntegrationTest {
 
     @Test
-    public void crudBLOBSuccessful() throws SQLException, ClassNotFoundException, IOException {
+    public void creatinAndReadingBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
         /*Class.forName(Constants.H2_DRIVER_CLASS);
         Connection conn = DriverManager.
                 getConnection("jdbc:h2:~/test", "sa", "");
@@ -48,7 +48,7 @@ public class BLOBIntegrationTest {
 
         PreparedStatement psInsert = conn.prepareStatement(
                 """
-                    insert into test_table_blob (val_blob) values (?)
+                    insert into test_table_blob (val_blob, val_blob2, val_blob3) values (?, ?, ?)
                     """
         );
 
@@ -57,10 +57,15 @@ public class BLOBIntegrationTest {
         //preparaed statement created previously
         blob.setBytes(1, testString.getBytes());
         psInsert.setBlob(1, blob);
+        String testString2 = "BLOB VIA INPUT STREAM";
+        InputStream inputStream = new ByteArrayInputStream(testString2.getBytes());
+        psInsert.setBlob(2 , inputStream);
+        InputStream inputStream2 = new ByteArrayInputStream(testString2.getBytes());
+        psInsert.setBlob(3, inputStream2, 5);
         //TODO test blobs with Input stream as well
         psInsert.executeUpdate();
 
-        java.sql.PreparedStatement psSelect = conn.prepareStatement("select val_blob from test_table_blob ");
+        java.sql.PreparedStatement psSelect = conn.prepareStatement("select val_blob, val_blob2, val_blob3 from test_table_blob ");
         ResultSet resultSet = psSelect.executeQuery();
         resultSet.next();
         //TODO also get blob by col name
@@ -72,6 +77,18 @@ public class BLOBIntegrationTest {
         //TODO add tests for oder operations like getting the pos by sending a partial array of bytes and start pos
         Assert.assertEquals(testString, fromBlobByIdx);
 
+        Blob blobResultByName =  resultSet.getBlob("val_blob");
+        String fromBlobByName = new String(blobResultByName.getBinaryStream().readAllBytes());
+        Assert.assertEquals(testString, fromBlobByName);
+
+        Blob blobResult2 =  resultSet.getBlob(2);
+        String fromBlobByIdx2 = new String(blobResult2.getBinaryStream().readAllBytes());
+        Assert.assertEquals(testString2, fromBlobByIdx2);
+
+        Blob blobResult3 =  resultSet.getBlob(3);
+        String fromBlobByIdx3 = new String(blobResult3.getBinaryStream().readAllBytes());
+        Assert.assertEquals(testString2.substring(0, 5), fromBlobByIdx3);
+
         executeUpdate(conn,
                 """
                     delete from test_table_blob
@@ -82,6 +99,71 @@ public class BLOBIntegrationTest {
         psSelect.close();
         conn.close();
     }
+
+    @Test
+    public void creatinAndReadingLargeBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
+/*        Class.forName(Constants.H2_DRIVER_CLASS);
+        Connection conn = DriverManager.
+                getConnection("jdbc:h2:~/test", "sa", "");
+*/
+        Class.forName("org.openjdbcproxy.jdbc.Driver");
+        Connection conn = DriverManager.
+                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+
+        try {
+            this.executeUpdate(conn,
+                    """
+                            drop table test_table_blob
+                            """);
+        } catch (Exception e) {
+            //If fails disregard as per the table is most possibly not created yet
+        }
+
+        this.executeUpdate(conn,
+                """
+                create table test_table_blob(
+                         val_blob  BLOB
+                )
+                """);
+
+        PreparedStatement psInsert = conn.prepareStatement(
+                """
+                    insert into test_table_blob (val_blob) values (?)
+                    """
+        );
+
+
+        InputStream inputStream = this.getClass().getClassLoader().getResourceAsStream("largeTextFile.txt");
+        psInsert.setBlob(1 , inputStream);
+
+        psInsert.executeUpdate();
+
+        java.sql.PreparedStatement psSelect = conn.prepareStatement("select val_blob from test_table_blob ");
+        ResultSet resultSet = psSelect.executeQuery();
+        resultSet.next();
+        Blob blobResult =  resultSet.getBlob(1);
+
+        InputStream inputStreamTestFile = this.getClass().getClassLoader().getResourceAsStream("largeTextFile.txt");
+        InputStream inputStreamBlob = blobResult.getBinaryStream();
+
+        int byteFile = inputStreamTestFile.read();
+        while (byteFile != -1) {
+            int blobByte = inputStreamBlob.read();
+            Assert.assertEquals(byteFile, blobByte);
+            byteFile = inputStreamTestFile.read();
+        }
+
+        executeUpdate(conn,
+                """
+                    delete from test_table_blob
+                    """
+        );
+
+        resultSet.close();
+        psSelect.close();
+        conn.close();
+    }
+
 
     private int executeUpdate(Connection conn, String s) throws SQLException {
         try (Statement stmt =  conn.createStatement()) {

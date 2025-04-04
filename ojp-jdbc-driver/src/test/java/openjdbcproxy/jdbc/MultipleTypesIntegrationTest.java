@@ -20,7 +20,7 @@ public class MultipleTypesIntegrationTest {
     @Test
     public void typesCoverageTestSuccessful() throws SQLException, ClassNotFoundException, ParseException {
         Class.forName("org.openjdbcproxy.jdbc.Driver");
-        Connection conn = DriverManager.
+        org.openjdbcproxy.jdbc.Connection conn = (org.openjdbcproxy.jdbc.Connection) DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
 
         try {

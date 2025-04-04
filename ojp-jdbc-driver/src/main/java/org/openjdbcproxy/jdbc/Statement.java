@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.util.Iterator;
 
+import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.jdbc.Constants.EMPTY_PARAMETERS_LIST;
 
 public class Statement implements java.sql.Statement {
@@ -28,7 +29,9 @@ public class Statement implements java.sql.Statement {
 
     @Override
     public int executeUpdate(String sql) throws SQLException {
-        return this.statementService.executeUpdate(this.connection.getSession(), sql, EMPTY_PARAMETERS_LIST);
+        OpResult result = this.statementService.executeUpdate(this.connection.getSession(), sql, EMPTY_PARAMETERS_LIST);
+        this.connection.setSession(result.getSession());//TODO see if can do this in one place instead of updating session everywhere
+        return deserialize(result.getValue().toByteArray(), Integer.class);
     }
 
     @Override

@@ -8,6 +8,7 @@ import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ReadLobRequest;
 import com.openjdbcproxy.grpc.SessionInfo;
+import com.openjdbcproxy.grpc.SessionTerminationStatus;
 import com.openjdbcproxy.grpc.StatementRequest;
 import com.openjdbcproxy.grpc.StatementServiceGrpc;
 import io.grpc.ManagedChannel;
@@ -15,7 +16,9 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.grpc.dto.Parameter;
+import org.openjdbcproxy.jdbc.Connection;
 import org.openjdbcproxy.jdbc.LobGrpcIterator;
 
 import java.sql.SQLException;
@@ -23,13 +26,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 
 /**
  * Interacts with the GRPC client stub and handles exceptions.
  */
+@Slf4j
 public class StatementServiceGrpcClient implements StatementService {
 
     private final StatementServiceGrpc.StatementServiceBlockingStub statemetServiceBlockingStub;
@@ -55,11 +58,10 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public Integer executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException {
+    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException {
         try {
-            OpResult result = this.statemetServiceBlockingStub.executeUpdate(StatementRequest.newBuilder()
+            return this.statemetServiceBlockingStub.executeUpdate(StatementRequest.newBuilder()
                     .setSession(sessionInfo).setSql(sql).setParameters(ByteString.copyFrom(serialize(params))).build());
-            return deserialize(result.getValue().toByteArray(), Integer.class);
         } catch (StatusRuntimeException e) {
             throw handle(e);
         }
@@ -76,7 +78,7 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public LobReference createLob(Iterator<LobDataBlock> lobDataBlock) throws SQLException {
+    public LobReference createLob(Connection connection, Iterator<LobDataBlock> lobDataBlock) throws SQLException {
         try {
             //Indicates that the server acquired a connection to the DB and wrote the first block successfully.
             SettableFuture<LobReference> sfFirstLobReference = SettableFuture.create();
@@ -134,6 +136,8 @@ public class StatementServiceGrpcClient implements StatementService {
                                 sfFirstLobReference.set(lobReference);
                             }
                             this.lobReference = lobReference;
+                            //Update connection session on first confirmation to get the session id if session is new.
+                            connection.setSession(lobReference.getSession());
                         }
 
                         @Override
@@ -275,5 +279,73 @@ public class StatementServiceGrpcClient implements StatementService {
         } catch (Exception e) {
             throw new SQLException("Unable to write LOB: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public void terminateSession(SessionInfo session) {
+        //Fire and forget
+        this.statemetServiceStub.terminateSession(session, new ServerCallStreamObserver<>() {
+            @Override
+            public boolean isCancelled() {
+                return false;
+            }
+
+            @Override
+            public void setOnCancelHandler(Runnable runnable) {
+
+            }
+
+            @Override
+            public void setCompression(String s) {
+
+            }
+
+            @Override
+            public boolean isReady() {
+                return false;
+            }
+
+            @Override
+            public void setOnReadyHandler(Runnable runnable) {
+
+            }
+
+            @Override
+            public void request(int i) {
+
+            }
+
+            @Override
+            public void setMessageCompression(boolean b) {
+
+            }
+
+            @Override
+            public void disableAutoInboundFlowControl() {
+
+            }
+
+            @Override
+            public void onNext(SessionTerminationStatus sessionTerminationStatus) {
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                Throwable t = throwable;
+                if (throwable instanceof StatusRuntimeException sre) {
+                    try {
+                        handle(sre);
+                    } catch (SQLException e) {
+                        t = e;
+                    }
+                }
+                log.error("Error while closing session: " + t.getMessage(), t);
+            }
+
+            @Override
+            public void onCompleted() {
+                int i = 0;
+            }
+        });
     }
 }

@@ -1,8 +1,10 @@
 package org.openjdbcproxy.jdbc;
 
+import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.SessionInfo;
 import lombok.Getter;
 import lombok.Setter;
+import org.apache.commons.lang3.StringUtils;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.sql.Array;
@@ -75,6 +77,9 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public void close() throws SQLException {
+        if (StringUtils.isNotEmpty(this.session.getSessionUUID())) {
+            this.statementService.terminateSession(this.session);
+        }
     }
 
     @Override
@@ -220,7 +225,9 @@ public class Connection implements java.sql.Connection {
     @Override
     public Blob createBlob() throws SQLException {
         return new org.openjdbcproxy.jdbc.Blob(this, new LobServiceImpl(this, this.statementService),
-                this.statementService);
+                this.statementService,
+                null
+        );
     }
 
     @Override

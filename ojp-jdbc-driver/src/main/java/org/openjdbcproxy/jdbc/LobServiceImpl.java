@@ -47,7 +47,9 @@ public class LobServiceImpl implements LobService {
                 byte[] bytesRead;
                 if (nextBytes.length > 0) {
                     //Concatenate the one byte already read in the hasNext method
-                    bytesRead = Bytes.concat(nextBytes, bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE - 1));
+                    //TODO reading all bytes only for tests with H2
+                    //bytesRead = Bytes.concat(nextBytes, bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE - 1));
+                    bytesRead = Bytes.concat(nextBytes, bis.readAllBytes());
                 } else {
                     bytesRead = bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE);
                 }
@@ -60,7 +62,7 @@ public class LobServiceImpl implements LobService {
             }
         };
 
-        return this.statementService.createLob(itLobDataBlocks);
+        return this.statementService.createLob(this.connection, itLobDataBlocks);
     }
 
     @Override

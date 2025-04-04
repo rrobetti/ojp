@@ -1,11 +1,13 @@
 package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.OpResult;
-import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
 import java.net.URL;
@@ -29,6 +31,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.grpc.dto.ParameterType.ARRAY;
 import static org.openjdbcproxy.grpc.dto.ParameterType.ASCII_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.BIG_DECIMAL;
@@ -58,6 +61,7 @@ import static org.openjdbcproxy.grpc.dto.ParameterType.TIME;
 import static org.openjdbcproxy.grpc.dto.ParameterType.TIMESTAMP;
 import static org.openjdbcproxy.grpc.dto.ParameterType.UNICODE_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.URL;
+import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
 
 public class PreparedStatement implements java.sql.PreparedStatement {
     private final Connection connection;
@@ -81,7 +85,9 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
-        return this.statementService.executeUpdate(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList());
+        OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList());
+        this.connection.setSession(result.getSession());
+        return deserialize(result.getValue().toByteArray(), Integer.class);
     }
 
     @Override
@@ -417,12 +423,27 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
-        //TODO see if can use similar/same reader communication layer as other methods that require reader
-        this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BLOB)
-                    .values(List.of(inputStream, length))
-                    .build());
+        try {
+            //TODO review length not being used here
+            org.openjdbcproxy.jdbc.Blob blob = (org.openjdbcproxy.jdbc.Blob) this.getConnection().createBlob();
+            OutputStream os = blob.setBinaryStream(1);
+            int byteRead = inputStream.read();
+            int writtenLength = 0;
+            while (byteRead != -1 && length > writtenLength) {
+                os.write(byteRead);
+                writtenLength++;
+                byteRead = inputStream.read();
+            }
+            os.close();
+            this.paramsMap.put(parameterIndex,
+                    Parameter.builder()
+                            .type(BLOB)
+                            .values(List.of(blob.getUUID()))
+                            .build()
+            );
+        } catch (IOException e) {
+            throw new SQLException("Unable to write bytes: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -473,7 +494,6 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
-
     }
 
     @Override
@@ -503,7 +523,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, InputStream inputStream) throws SQLException {
-
+        this.setBlob(parameterIndex, inputStream, Integer.MAX_VALUE);
     }
 
     @Override

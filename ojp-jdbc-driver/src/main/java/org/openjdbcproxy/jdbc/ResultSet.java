@@ -2,7 +2,6 @@ package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.OpResult;
-import com.openjdbcproxy.grpc.SessionInfo;
 import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
@@ -52,7 +51,7 @@ public class ResultSet implements java.sql.ResultSet {
         this.itResults = itOpResult;
         try {
             this.statement = statement;
-            OpResult result = itOpResult.next();
+            OpResult result = nextWithSessionUpdate(itOpResult.next());
             OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
 
             this.statementService = statementService;
@@ -72,7 +71,7 @@ public class ResultSet implements java.sql.ResultSet {
         blockIdx.incrementAndGet();
         if (blockIdx.get() >= currentDataBlock.size() && itResults.hasNext()) {
             try {
-                OpResult result = itResults.next();
+                OpResult result = this.nextWithSessionUpdate(itResults.next());
                 OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
                 this.currentDataBlock = opQueryResult.getRows();
                 this.blockCount.incrementAndGet();
@@ -83,6 +82,11 @@ public class ResultSet implements java.sql.ResultSet {
         }
 
         return blockIdx.get() < currentDataBlock.size();
+    }
+
+    private OpResult nextWithSessionUpdate(OpResult next) throws SQLException {
+        ((Connection)this.statement.getConnection()).setSession(next.getSession());
+        return next;
     }
 
     @Override
@@ -691,7 +695,15 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public Blob getBlob(String columnLabel) throws SQLException {
-        throw new RuntimeException("Not implemented");
+        String blobRefUUID = (String) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return new org.openjdbcproxy.jdbc.Blob((Connection) this.statement.getConnection(),
+                new LobServiceImpl((Connection) this.statement.getConnection(), this.statementService),
+                this.statementService,
+                LobReference.newBuilder()
+                        .setSession(((Connection) this.statement.getConnection()).getSession())
+                        .setUuid(blobRefUUID)
+                        .build()
+        );
     }
 
     @Override

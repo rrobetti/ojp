@@ -1,5 +1,6 @@
 package org.openjdbcproxy.jdbc;
 
+import com.google.common.util.concurrent.SettableFuture;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
 import io.grpc.StatusRuntimeException;
@@ -9,25 +10,43 @@ import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
 import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 
-@RequiredArgsConstructor
-@AllArgsConstructor
 public class Blob implements java.sql.Blob {
     private final Connection connection;
     private final LobService lobService;
     private final StatementService statementService;
-    private LobReference lobReference = null;
+    private final SettableFuture<LobReference> lobReference = SettableFuture.create();
+
+    public Blob(Connection connection, LobService lobService, StatementService statementService, LobReference lobReference) {
+        this.connection = connection;
+        this.lobService = lobService;
+        this.statementService = statementService;
+        if (lobReference != null) {
+            this.lobReference.set(lobReference);
+        }
+    }
 
     public String getUUID() {
-        return (this.lobReference != null) ? this.lobReference.getUuid() : null;
+        try {
+            return (this.lobReference != null) ? this.lobReference.get().getUuid() : null;
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);//TODO review
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);//TODO review
+        }
     }
 
     @Override
@@ -39,7 +58,7 @@ public class Blob implements java.sql.Blob {
     public byte[] getBytes(long pos, int length) throws SQLException {
         try {
             this.haveBlobReferenceValidation();
-            Iterator<LobDataBlock> dataBlocks = this.statementService.readLob(this.lobReference, pos, length);
+            Iterator<LobDataBlock> dataBlocks = this.statementService.readLob(this.lobReference.get(), pos, length);
             InputStream is = this.lobService.parseReceivedBlocks(dataBlocks);
             BufferedInputStream bis = new BufferedInputStream(is);
             return bis.readAllBytes();
@@ -79,7 +98,7 @@ public class Blob implements java.sql.Blob {
                         //Read next 2 blocks
                         Iterator<LobDataBlock> dataBlocks = null;
                         try {
-                            dataBlocks = statementService.readLob(lobReference, currentPos, TWO_BLOCKS_SIZE);
+                            dataBlocks = statementService.readLob(lobReference.get(), currentPos, TWO_BLOCKS_SIZE);
                             this.currentBlockInputStream = lobService.parseReceivedBlocks(dataBlocks);
                             currentByte = this.currentBlockInputStream.read();
                         } catch (SQLException e) {
@@ -90,6 +109,10 @@ public class Blob implements java.sql.Blob {
                             } catch (SQLException ex) {
                                 throw new RuntimeException(ex);
                             }
+                        } catch (ExecutionException e) {
+                            throw new RuntimeException(e);//TODO review
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);//TODO review
                         }
                     }
 
@@ -118,10 +141,19 @@ public class Blob implements java.sql.Blob {
     @Override
     public int setBytes(long pos, byte[] bytes) throws SQLException {
         InputStream is = new ByteArrayInputStream(bytes);
-        this.lobReference = this.lobService.sendBytes(pos, is);
-        //Refresh Session object.
-        this.connection.setSession(this.lobReference.getSession());
-        return lobReference.getBytesWritten();
+        OutputStream os = this.setBinaryStream(pos);
+        int byteRead;
+        int writtenCount = 0;
+        try {
+            while ((byteRead = is.read()) != -1) {
+                os.write(byteRead);
+                writtenCount++;
+            }
+            os.close();
+            return writtenCount;
+        } catch (IOException e) {
+            throw new RuntimeException(e);//TODO review
+        }
     }
 
     @Override
@@ -131,7 +163,33 @@ public class Blob implements java.sql.Blob {
 
     @Override
     public OutputStream setBinaryStream(long pos) throws SQLException {
-        return null;
+        try {
+            //connect the pipes. Makes the OutputStream written by the caller feed into the InputStream read by the sender.
+            PipedInputStream in = new PipedInputStream();
+            PipedOutputStream out = new PipedOutputStream(in);
+
+            CompletableFuture.supplyAsync(() -> {
+                try {
+                    this.lobReference.set(this.lobService.sendBytes(pos, in));
+                } catch (SQLException e) {
+                    throw new RuntimeException(e);
+                }
+                //Refresh Session object.
+                try {
+                    this.connection.setSession(this.lobReference.get().getSession());
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);//TODO review
+                } catch (ExecutionException e) {
+                    throw new RuntimeException(e);//TODO review
+                }
+                return null;
+            });
+
+            return out;
+        } catch (Exception e) {
+            e.printStackTrace();//TODO treat exception
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
