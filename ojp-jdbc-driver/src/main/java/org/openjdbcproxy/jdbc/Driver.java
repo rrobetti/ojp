@@ -33,6 +33,11 @@ public class Driver implements java.sql.Driver {
 
     @Override
     public java.sql.Connection connect(String url, Properties info) throws SQLException {
+        if (url.toUpperCase().contains("H2:")) {
+            DbInfo.setH2DB(true);
+        } else {
+            DbInfo.setH2DB(false);
+        }
         SessionInfo sessionInfo = this.statementService
                 .connect(ConnectionDetails.newBuilder()
                         .setUrl(url)

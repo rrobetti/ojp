@@ -424,7 +424,6 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
         try {
-            //TODO review length not being used here
             org.openjdbcproxy.jdbc.Blob blob = (org.openjdbcproxy.jdbc.Blob) this.getConnection().createBlob();
             OutputStream os = blob.setBinaryStream(1);
             int byteRead = inputStream.read();

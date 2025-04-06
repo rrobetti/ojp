@@ -46,10 +46,13 @@ public class LobServiceImpl implements LobService {
             public synchronized LobDataBlock next() {
                 byte[] bytesRead;
                 if (nextBytes.length > 0) {
-                    //Concatenate the one byte already read in the hasNext method
-                    //TODO reading all bytes only for tests with H2
-                    //bytesRead = Bytes.concat(nextBytes, bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE - 1));
-                    bytesRead = Bytes.concat(nextBytes, bis.readAllBytes());
+                    //H2 does not support multiple writes to the same blob. All is written at once. H2 error = Feature not supported: "Allocate a new object to set its value." [50100-232]
+                    if (DbInfo.isH2DB()) {
+                        bytesRead = Bytes.concat(nextBytes, bis.readAllBytes());
+                    } else {
+                        //Concatenate the one byte already read in the hasNext method
+                        bytesRead = Bytes.concat(nextBytes, bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE - 1));
+                    }
                 } else {
                     bytesRead = bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE);
                 }
