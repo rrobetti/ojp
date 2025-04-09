@@ -2,10 +2,8 @@ package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
 import org.junit.jupiter.api.Test;
-import org.openjdbcproxy.jdbc.Constants;
 
 import java.io.ByteArrayInputStream;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.Blob;
@@ -20,10 +18,6 @@ public class BLOBIntegrationTest {
 
     @Test
     public void creatinAndReadingBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
-        /*Class.forName(Constants.H2_DRIVER_CLASS);
-        Connection conn = DriverManager.
-                getConnection("jdbc:h2:~/test", "sa", "");
-        */
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
@@ -62,19 +56,14 @@ public class BLOBIntegrationTest {
         psInsert.setBlob(2 , inputStream);
         InputStream inputStream2 = new ByteArrayInputStream(testString2.getBytes());
         psInsert.setBlob(3, inputStream2, 5);
-        //TODO test blobs with Input stream as well
         psInsert.executeUpdate();
 
         java.sql.PreparedStatement psSelect = conn.prepareStatement("select val_blob, val_blob2, val_blob3 from test_table_blob ");
         ResultSet resultSet = psSelect.executeQuery();
         resultSet.next();
-        //TODO also get blob by col name
         Blob blobResult =  resultSet.getBlob(1);
-        //blobResult.free();
-        //TODO add multiple ways of getting bytes, by sending position and lengh for example
         String fromBlobByIdx = new String(blobResult.getBinaryStream().readAllBytes());
 
-        //TODO add tests for oder operations like getting the pos by sending a partial array of bytes and start pos
         Assert.assertEquals(testString, fromBlobByIdx);
 
         Blob blobResultByName =  resultSet.getBlob("val_blob");
@@ -102,10 +91,6 @@ public class BLOBIntegrationTest {
 
     @Test
     public void creatinAndReadingLargeBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
-/*        Class.forName(Constants.H2_DRIVER_CLASS);
-        Connection conn = DriverManager.
-                getConnection("jdbc:h2:~/test", "sa", "");
-*/
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
@@ -147,8 +132,17 @@ public class BLOBIntegrationTest {
         InputStream inputStreamBlob = blobResult.getBinaryStream();
 
         int byteFile = inputStreamTestFile.read();
+        int count = 0;
         while (byteFile != -1) {
+            count++;
+            if (count == 3072) {
+                System.out.println(count);
+            }
             int blobByte = inputStreamBlob.read();
+            if (byteFile != blobByte) {
+                System.out.println(count);
+            }
+
             Assert.assertEquals(byteFile, blobByte);
             byteFile = inputStreamTestFile.read();
         }
