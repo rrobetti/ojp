@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Blob;
+import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -30,7 +31,7 @@ public class Session {
     private Map<String, ResultSet> resultSetMap;
     private Map<String, Statement> statementMap;
     private Map<String, PreparedStatement> preparedStatementMap;
-    private Map<String, Blob> blobMap;
+    private Map<String, Object> lobMap;
     private boolean closed;
 
     public Session(Connection connection, String connectionHash, String clientUUID) {
@@ -42,7 +43,7 @@ public class Session {
         this.resultSetMap = new ConcurrentHashMap<>();
         this.statementMap = new ConcurrentHashMap<>();
         this.preparedStatementMap = new ConcurrentHashMap<>();
-        this.blobMap = new ConcurrentHashMap<>();
+        this.lobMap = new ConcurrentHashMap<>();
     }
 
     public SessionInfo getSessionInfo() {
@@ -84,14 +85,14 @@ public class Session {
         return this.preparedStatementMap.get(uuid);
     }
 
-    public void addBlob(String uuid, Blob b) {
+    public void addLob(String uuid, Object o) {
         this.notClosed();
-        this.blobMap.put(uuid, b);
+        this.lobMap.put(uuid, o);
     }
 
-    public Blob getBlob(String uuid) {
+    public <T> T getLob(String uuid) {
         this.notClosed();
-        return this.blobMap.get(uuid);
+        return (T) this.lobMap.get(uuid);
     }
 
     private void notClosed() {
@@ -102,9 +103,13 @@ public class Session {
 
     public void terminate() throws SQLException {
         //Free all blobs
-        for (Blob b : this.blobMap.values()) {
+        for (Object o : this.lobMap.values()) {
             try {
-                b.free();
+                if (o instanceof Blob b) {
+                    b.free();
+                } else if (o instanceof Clob c) {
+                    c.free();
+                }
             } catch (Exception e) {
                 log.error("Failed to free Blob: " + e.getMessage(), e);
             }
@@ -139,7 +144,7 @@ public class Session {
 
         //Clear internal objects
         this.closed = true;
-        this.blobMap = null;
+        this.lobMap = null;
         this.resultSetMap = null;
         this.statementMap = null;
         this.preparedStatementMap = null;

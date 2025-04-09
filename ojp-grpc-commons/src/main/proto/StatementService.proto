@@ -25,11 +25,6 @@ enum ResultType {
     RESULT_SET_DATA = 1;
 }
 
-enum LobType {
-    BINARY = 0;
-    CHARACTER = 1;
-}
-
 message OpResult {
     SessionInfo session = 1;
     ResultType type = 2;
@@ -48,10 +43,16 @@ message SqlErrorResponse {
     int32 vendorCode = 3;
 }
 
+enum LobType {
+    LT_BLOB = 0;
+    LT_CLOB = 1;
+}
+
 message LobReference {
     SessionInfo session = 1;
     string uuid = 2;
     int32 bytesWritten = 3;
+    LobType lobType = 4;
 }
 
 message ReadLobRequest {
@@ -64,6 +65,7 @@ message LobDataBlock {
     SessionInfo session = 1;
     int64 position = 2;
     bytes data = 3;
+    LobType lobType = 4;
 }
 
 message SessionTerminationStatus {

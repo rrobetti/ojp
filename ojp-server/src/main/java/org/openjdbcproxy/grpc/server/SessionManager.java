@@ -1,5 +1,6 @@
 package org.openjdbcproxy.grpc.server;
 
+import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.SessionInfo;
 
 import java.sql.Blob;
@@ -22,7 +23,7 @@ public interface SessionManager {
     Statement getStatement(SessionInfo sessionInfo, String uuid);
     String registerPreparedStatement(SessionInfo sessionInfo, PreparedStatement ps);
     PreparedStatement getPreparedStatement(SessionInfo sessionInfo, String uuid);
-    String registerBlob(SessionInfo sessionInfo, Blob blob);
-    Blob getBlob(SessionInfo sessionInfo, String uuid);
+    String registerLob(SessionInfo sessionInfo, Object o);
+    <T> T getLob(SessionInfo sessionInfo, String uuid);
     void terminateSession(SessionInfo sessionInfo) throws SQLException;
 }

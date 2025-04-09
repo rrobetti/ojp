@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
+import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ReadLobRequest;
 import com.openjdbcproxy.grpc.ResultType;
@@ -24,9 +25,13 @@ import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
 import java.io.BufferedInputStream;
+import java.io.InputStream;
+import java.io.Writer;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Blob;
+import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -140,7 +145,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
         responseObserver.onNext(OpResult.newBuilder()
                 .setType(ResultType.INTEGER)
-                        .setSession(returnSessionInfo)
+                .setSession(returnSessionInfo)
                 .setValue(ByteString.copyFrom(serialize(updated))).build());
         responseObserver.onCompleted();
     }
@@ -177,6 +182,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         return new ServerCallStreamObserver<>() {
             private SessionInfo sessionInfo;
             private String lobUUID;
+            private LobType lobType;
             private final AtomicBoolean isFirstBlock = new AtomicBoolean(true);
             private final AtomicInteger countBytesWritten = new AtomicInteger(0);
 
@@ -223,16 +229,31 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             @Override
             public void onNext(LobDataBlock lobDataBlock) {
                 try {
+                    this.lobType = lobDataBlock.getLobType();
                     ConnectionSessionDTO dto = sessionConnection(lobDataBlock.getSession(), true);
                     Connection conn = dto.getConnection();
                     if (StringUtils.isEmpty(lobDataBlock.getSession().getSessionUUID()) || this.lobUUID == null) {
-                        Blob newBlob = conn.createBlob();
-                        this.lobUUID = sessionManager.registerBlob(dto.getSession(), newBlob);
+                        if (LobType.LT_BLOB.equals(this.lobType)) {
+                            Blob newBlob = conn.createBlob();
+                            this.lobUUID = sessionManager.registerLob(dto.getSession(), newBlob);
+                        } else if (LobType.LT_CLOB.equals(this.lobType)) {
+                            Clob newClob = conn.createClob();
+                            this.lobUUID = sessionManager.registerLob(dto.getSession(), newClob);
+                        }
                     }
 
-                    Blob blob = sessionManager.getBlob(dto.getSession(), this.lobUUID);
-                    byte[] byteArrayData = lobDataBlock.getData().toByteArray();
-                    int bytesWritten = blob.setBytes(lobDataBlock.getPosition(), byteArrayData);
+                    int bytesWritten = 0;
+                    if (LobType.LT_BLOB.equals(this.lobType)) {
+                        Blob blob = sessionManager.getLob(dto.getSession(), this.lobUUID);
+                        byte[] byteArrayData = lobDataBlock.getData().toByteArray();
+                        bytesWritten = blob.setBytes(lobDataBlock.getPosition(), byteArrayData);
+                    } else if (LobType.LT_CLOB.equals(this.lobType)) {
+                        Clob clob = sessionManager.getLob(dto.getSession(), this.lobUUID);
+                        byte[] byteArrayData = lobDataBlock.getData().toByteArray();
+                        Writer writer = clob.setCharacterStream(lobDataBlock.getPosition());
+                        writer.write(new String(byteArrayData, StandardCharsets.UTF_8).toCharArray());
+                        bytesWritten = byteArrayData.length;
+                    }
                     this.countBytesWritten.addAndGet(bytesWritten);
                     this.sessionInfo = dto.getSession();
 
@@ -242,6 +263,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         responseObserver.onNext(LobReference.newBuilder()
                                 .setSession(dto.getSession())
                                 .setUuid(this.lobUUID)
+                                .setLobType(this.lobType)
                                 .setBytesWritten(bytesWritten)
                                 .build()
                         );
@@ -250,6 +272,8 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
                 } catch (SQLException e) {
                     sendSQLExceptionMetadata(e, responseObserver);
+                } catch (Exception e) {
+                    sendSQLExceptionMetadata(new SQLException("Unable to write data: " + e.getMessage(), e), responseObserver);
                 }
             }
 
@@ -264,6 +288,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                 responseObserver.onNext(LobReference.newBuilder()
                         .setSession(this.sessionInfo)
                         .setUuid(this.lobUUID)
+                        .setLobType(this.lobType)
                         .setBytesWritten(this.countBytesWritten.get())
                         .build()
                 );responseObserver.onCompleted();
@@ -275,23 +300,45 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     public void readLob(ReadLobRequest request, StreamObserver<LobDataBlock> responseObserver) {
         try {
             LobReference lobRef = request.getLobReference();
-            Blob blob = this.sessionManager.getBlob(lobRef.getSession(), lobRef.getUuid());
+            Blob blob = this.sessionManager.getLob(lobRef.getSession(), lobRef.getUuid());
             long blobLength = blob.length();
-            long readLength = (request.getLength() < blobLength) ? request.getLength() : blobLength;
-            BufferedInputStream bisBlob = new BufferedInputStream(blob.getBinaryStream(request.getPosition(), readLength));
-            byte[] nextBlobk = bisBlob.readNBytes(MAX_LOB_DATA_BLOCK_SIZE);
-            int blockCount = 0;
-            while (nextBlobk.length > 0) {
-                //Send data to client in limited size blocks to safeguard server memory.
+            int availableLength = (request.getPosition() + request.getLength()) < blobLength ? request.getLength() :
+                    (int) (blobLength - request.getPosition() + 1);
+            InputStream inputStream = blob.getBinaryStream(request.getPosition(), availableLength);
+            int nextByte = inputStream.read();
+            int nextBlockSize = this.nextBlockSize(blobLength, request.getPosition(), availableLength);
+            byte[] nextBlock = new byte[nextBlockSize];
+            int idx = -1;
+            int currentPos = (int) request.getPosition();
+            while (nextByte != -1) {
+                nextBlock[++idx] = (byte) nextByte;
+                if (idx == nextBlockSize - 1) {
+                    currentPos += idx;
+                    //Send data to client in limited size blocks to safeguard server memory.
+                    responseObserver.onNext(LobDataBlock.newBuilder()
+                            .setSession(lobRef.getSession())
+                            .setPosition(currentPos + 1)
+                            .setData(ByteString.copyFrom(nextBlock))
+                            .build()
+                    );
+                    nextBlockSize = this.nextBlockSize(blobLength, currentPos, availableLength);
+                    nextBlock = new byte[nextBlockSize];
+                    idx = -1;
+                }
+                nextByte = inputStream.read();
+            }
+
+            //Send leftover bytes
+            if (nextBlock.length > 0 && nextBlock[0] != -1) {
+                currentPos = (int) request.getPosition() + idx;
                 responseObserver.onNext(LobDataBlock.newBuilder()
                         .setSession(lobRef.getSession())
-                        .setPosition(((long) blockCount * MAX_LOB_DATA_BLOCK_SIZE) + nextBlobk.length + 1)
-                        .setData(ByteString.copyFrom(nextBlobk))
+                        .setPosition(currentPos)
+                        .setData(ByteString.copyFrom(nextBlock))
                         .build()
                 );
-                blockCount++;
-                nextBlobk = bisBlob.readNBytes(MAX_LOB_DATA_BLOCK_SIZE);
             }
+
             responseObserver.onCompleted();
 
         } catch (SQLException se) {
@@ -299,6 +346,22 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private int nextBlockSize(long blobLength, long position, int length) {
+        //Single read situations
+        if ((int) blobLength == length && position == 1) {
+            return length;
+        }
+        int nextBlockSize = Math.min(MAX_LOB_DATA_BLOCK_SIZE, length);
+        int nextPos = (int) (position + nextBlockSize);
+        if (nextPos > blobLength) {
+            nextBlockSize = Math.toIntExact(nextBlockSize - (nextPos - blobLength));
+        } else if ((position + 1) % length == 0) {
+            nextBlockSize = 0;
+        }
+
+        return nextBlockSize;
     }
 
     @Override
@@ -370,8 +433,11 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             for (int i = 0; i < columnCount; i++) {
                 Object currentValue = rs.getObject(i + 1);
                 if (currentValue instanceof Blob blob) {
-                    String newBlobUUID = this.sessionManager.registerBlob(session, blob);
+                    String newBlobUUID = this.sessionManager.registerLob(session, blob);
                     currentValue = newBlobUUID;
+                } else if (currentValue instanceof Clob clob) {
+                    String newClobUUID = this.sessionManager.registerLob(session, clob);
+                    currentValue = newClobUUID;
                 }
                 rowValues[i] = currentValue;
             }
@@ -425,7 +491,12 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case DATE -> ps.setDate(idx, (Date) param.getValues().getFirst());
             case TIME -> ps.setTime(idx, (Time) param.getValues().getFirst());
             case TIMESTAMP -> ps.setTimestamp(idx, (Timestamp) param.getValues().getFirst());
-            case BLOB -> ps.setBlob(idx, this.sessionManager.getBlob(session, (String) param.getValues().getFirst()));
+            //LOB types
+            case BLOB -> ps.setBlob(idx, this.sessionManager.<Blob>getLob(session, (String) param.getValues().getFirst()));
+            case CLOB -> {
+                Clob clob = this.sessionManager.getLob(session, (String) param.getValues().getFirst());
+                ps.setClob(idx, clob.getCharacterStream());
+            }
             default -> ps.setObject(idx, param.getValues().getFirst());
         }
     }

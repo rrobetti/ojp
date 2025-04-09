@@ -1,5 +1,6 @@
 package org.openjdbcproxy.grpc.server;
 
+import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.SessionInfo;
 import lombok.extern.slf4j.Slf4j;
 
@@ -77,15 +78,15 @@ public class SessionManagerImpl implements SessionManager{
     }
 
     @Override
-    public String registerBlob(SessionInfo sessionInfo, Blob blob) {
+    public String registerLob(SessionInfo sessionInfo, Object blob) {
         String uuid = UUID.randomUUID().toString();
-        this.sessionMap.get(sessionInfo.getSessionUUID()).addBlob(uuid, blob);
+        this.sessionMap.get(sessionInfo.getSessionUUID()).addLob(uuid, blob);
         return uuid;
     }
 
     @Override
-    public Blob getBlob(SessionInfo sessionInfo, String uuid) {
-        return this.sessionMap.get(sessionInfo.getSessionUUID()).getBlob(uuid);
+    public <T> T getLob(SessionInfo sessionInfo, String uuid) {
+        return (T) this.sessionMap.get(sessionInfo.getSessionUUID()).getLob(uuid);
     }
 
     @Override
