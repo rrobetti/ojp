@@ -93,117 +93,117 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(NULL)
-                    .build());
+                Parameter.builder()
+                        .type(NULL)
+                        .build());
     }
 
     @Override
     public void setBoolean(int parameterIndex, boolean x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                .type(BOOLEAN)
-                .values(List.of(x))
-                .build());
+                Parameter.builder()
+                        .type(BOOLEAN)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setByte(int parameterIndex, byte x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BYTE)
-                    .values(List.of(new byte[]{x}))//Transform to byte array as it becomes an Object facilitating serialization.
-                    .build());
+                Parameter.builder()
+                        .type(BYTE)
+                        .values(List.of(new byte[]{x}))//Transform to byte array as it becomes an Object facilitating serialization.
+                        .build());
     }
 
     @Override
     public void setShort(int parameterIndex, short x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(SHORT)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(SHORT)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setInt(int parameterIndex, int x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(INT)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(INT)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setLong(int parameterIndex, long x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(LONG)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(LONG)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setFloat(int parameterIndex, float x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(FLOAT)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(FLOAT)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setDouble(int parameterIndex, double x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(DOUBLE)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(DOUBLE)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BIG_DECIMAL)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(BIG_DECIMAL)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setString(int parameterIndex, String x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(STRING)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(STRING)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setBytes(int parameterIndex, byte[] x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BYTES)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(BYTES)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setDate(int parameterIndex, Date x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(DATE)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(DATE)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setTime(int parameterIndex, Time x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(TIME)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(TIME)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
@@ -215,29 +215,29 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(ASCII_STREAM)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(ASCII_STREAM)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(UNICODE_STREAM)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(UNICODE_STREAM)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BINARY_STREAM)
-                    .values(List.of(x))
-                    .build());
-}
+                Parameter.builder()
+                        .type(BINARY_STREAM)
+                        .values(List.of(x))
+                        .build());
+    }
 
     @Override
     public void clearParameters() throws SQLException {
@@ -247,19 +247,19 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(OBJECT)
-                    .values(List.of(x, targetSqlType))
-                    .build());
+                Parameter.builder()
+                        .type(OBJECT)
+                        .values(List.of(x, targetSqlType))
+                        .build());
     }
 
     @Override
     public void setObject(int parameterIndex, Object x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(OBJECT)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(OBJECT)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
@@ -276,47 +276,48 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
         //TODO this will require an implementation of Reader that communicates across GRPC
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(CHARACTER_READER)
-                    .values(List.of(reader, length))
-                    .build());
+                Parameter.builder()
+                        .type(CHARACTER_READER)
+                        .values(List.of(reader, length))
+                        .build());
     }
 
     @Override
     public void setRef(int parameterIndex, Ref x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(REF)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(REF)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setBlob(int parameterIndex, Blob x) throws SQLException {
         String blobUUID = ((org.openjdbcproxy.jdbc.Blob) x).getUUID();
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BLOB)
-                    .values(List.of(blobUUID)) //Only send the Id as per the blob has been streamed in advance.
-                    .build());
+                Parameter.builder()
+                        .type(BLOB)
+                        .values(List.of(blobUUID)) //Only send the Id as per the blob has been streamed in advance.
+                        .build());
     }
 
     @Override
     public void setClob(int parameterIndex, Clob x) throws SQLException {
+        String clobUUID = ((org.openjdbcproxy.jdbc.Clob) x).getUUID();
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(CLOB)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(CLOB)
+                        .values(List.of(clobUUID))
+                        .build());
     }
 
     @Override
     public void setArray(int parameterIndex, Array x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(ARRAY)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(ARRAY)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
@@ -327,46 +328,46 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(DATE)
-                    .values(List.of(x, cal))
-                    .build());
+                Parameter.builder()
+                        .type(DATE)
+                        .values(List.of(x, cal))
+                        .build());
     }
 
     @Override
     public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(TIME)
-                    .values(List.of(x, cal))
-                    .build());
+                Parameter.builder()
+                        .type(TIME)
+                        .values(List.of(x, cal))
+                        .build());
     }
 
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(TIMESTAMP)
-                    .values(List.of(x, cal))
-                    .build());
-}
+                Parameter.builder()
+                        .type(TIMESTAMP)
+                        .values(List.of(x, cal))
+                        .build());
+    }
 
     @Override
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(NULL)
-                    .values(List.of(sqlType, typeName))
-                    .build());
+                Parameter.builder()
+                        .type(NULL)
+                        .values(List.of(sqlType, typeName))
+                        .build());
     }
 
     @Override
     public void setURL(int parameterIndex, URL x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(URL)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(URL)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
@@ -377,48 +378,62 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setRowId(int parameterIndex, RowId x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(ROW_ID)
-                    .values(List.of(x))
-                    .build());
+                Parameter.builder()
+                        .type(ROW_ID)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
     public void setNString(int parameterIndex, String value) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(N_STRING)
-                    .values(List.of(value))
-                    .build());
+                Parameter.builder()
+                        .type(N_STRING)
+                        .values(List.of(value))
+                        .build());
     }
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
         //TODO see if can use similar/same reader communication layer as other methods that require reader
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(N_CHARACTER_STREAM)
-                    .values(List.of(value, length))
-                    .build());
+                Parameter.builder()
+                        .type(N_CHARACTER_STREAM)
+                        .values(List.of(value, length))
+                        .build());
     }
 
     @Override
     public void setNClob(int parameterIndex, NClob value) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(N_CLOB)
-                    .values(List.of(value))
-                    .build());
+                Parameter.builder()
+                        .type(N_CLOB)
+                        .values(List.of(value))
+                        .build());
     }
 
     @Override
     public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
-        //TODO see if can use similar/same reader communication layer as other methods that require reader
-        this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(CLOB)
-                    .values(List.of(reader, length))
-                    .build());
+        try {
+            org.openjdbcproxy.jdbc.Clob clob = (org.openjdbcproxy.jdbc.Clob) this.getConnection().createClob();
+            OutputStream os = clob.setAsciiStream(1);
+            int byteRead = reader.read();
+            int writtenLength = 0;
+            while (byteRead != -1 && length > writtenLength) {
+                os.write(byteRead);
+                writtenLength++;
+                byteRead = reader.read();
+            }
+            os.close();
+            this.paramsMap.put(parameterIndex,
+                    Parameter.builder()
+                            .type(CLOB)
+                            .values(List.of(clob.getUUID()))
+                            .build()
+            );
+        } catch (IOException e) {
+            throw new SQLException("Unable to write CLOB bytes: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -441,7 +456,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
                             .build()
             );
         } catch (IOException e) {
-            throw new SQLException("Unable to write bytes: " + e.getMessage(), e);
+            throw new SQLException("Unable to write BLOB bytes: " + e.getMessage(), e);
         }
     }
 
@@ -449,46 +464,46 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
         //TODO see if can use similar/same reader communication layer as other methods that require reader
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(N_CLOB)
-                    .values(List.of(reader, length))
-                    .build());
+                Parameter.builder()
+                        .type(N_CLOB)
+                        .values(List.of(reader, length))
+                        .build());
     }
 
     @Override
     public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(SQL_XML)
-                    .values(List.of(xmlObject))
-                    .build());
+                Parameter.builder()
+                        .type(SQL_XML)
+                        .values(List.of(xmlObject))
+                        .build());
     }
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(OBJECT)
-                    .values(List.of(x, targetSqlType, scaleOrLength))
-                    .build());
+                Parameter.builder()
+                        .type(OBJECT)
+                        .values(List.of(x, targetSqlType, scaleOrLength))
+                        .build());
     }
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(ASCII_STREAM)
-                    .values(List.of(x, length))
-                    .build());
+                Parameter.builder()
+                        .type(ASCII_STREAM)
+                        .values(List.of(x, length))
+                        .build());
     }
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
         this.paramsMap.put(parameterIndex,
-            Parameter.builder()
-                    .type(BINARY_STREAM)
-                    .values(List.of(x, length))
-                    .build());
+                Parameter.builder()
+                        .type(BINARY_STREAM)
+                        .values(List.of(x, length))
+                        .build());
     }
 
     @Override
@@ -517,7 +532,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setClob(int parameterIndex, Reader reader) throws SQLException {
-
+        this.setClob(parameterIndex, reader, Long.MAX_VALUE);
     }
 
     @Override

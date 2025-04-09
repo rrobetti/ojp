@@ -259,7 +259,7 @@ public class StatementServiceGrpcClient implements StatementService {
 
                 @Override
                 public void onCompleted() {
-
+                    lobGrpcIterator.finished();
                 }
             });
 

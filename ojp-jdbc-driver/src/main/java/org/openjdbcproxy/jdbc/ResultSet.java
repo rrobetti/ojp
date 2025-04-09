@@ -1,6 +1,7 @@
 package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.LobReference;
+import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
 import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
@@ -675,7 +676,16 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public Clob getClob(int columnIndex) throws SQLException {
-        throw new RuntimeException("Not implemented");
+        String clobRefUUID = (String) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        return new org.openjdbcproxy.jdbc.Clob((Connection) this.statement.getConnection(),
+                new LobServiceImpl((Connection) this.statement.getConnection(), this.statementService),
+                this.statementService,
+                LobReference.newBuilder()
+                        .setSession(((Connection) this.statement.getConnection()).getSession())
+                        .setUuid(clobRefUUID)
+                        .setLobType(LobType.LT_CLOB)
+                        .build()
+        );
     }
 
     @Override

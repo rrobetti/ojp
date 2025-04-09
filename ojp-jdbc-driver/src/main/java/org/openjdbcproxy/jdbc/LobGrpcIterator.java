@@ -1,5 +1,6 @@
 package org.openjdbcproxy.jdbc;
 
+import com.google.common.util.concurrent.SettableFuture;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import lombok.Setter;
 
@@ -7,6 +8,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Iterator over the blocks received when getting a LOB object.
@@ -14,6 +18,7 @@ import java.util.List;
  */
 public class LobGrpcIterator implements Iterator<LobDataBlock> {
     private List<LobDataBlock> blocksReceived = Collections.synchronizedList(new ArrayList<>());
+    private boolean finished = false;
     @Setter
     private Throwable error;
 
@@ -26,7 +31,14 @@ public class LobGrpcIterator implements Iterator<LobDataBlock> {
         if (this.error != null) {
             throw new RuntimeException(this.error);
         }
-        return blocksReceived.size() > 0;
+        while (blocksReceived.isEmpty() && !finished) {
+            try {
+                Thread.sleep(1);//TODO implement this wait in a more efficient way.
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return !blocksReceived.isEmpty();
     }
 
     @Override
@@ -37,5 +49,9 @@ public class LobGrpcIterator implements Iterator<LobDataBlock> {
         LobDataBlock block = this.blocksReceived.getFirst();
         this.blocksReceived.removeFirst();
         return block;
+    }
+
+    public void finished() {
+        this.finished = true;
     }
 }

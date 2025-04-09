@@ -4,6 +4,7 @@ import com.google.common.primitives.Bytes;
 import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
+import com.openjdbcproxy.grpc.LobType;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import org.openjdbcproxy.grpc.client.StatementService;
@@ -24,7 +25,7 @@ public class LobServiceImpl implements LobService {
     private StatementService statementService;
 
     @Override
-    public LobReference sendBytes(long pos, InputStream is) throws SQLException {
+    public LobReference sendBytes(LobType lobType, long pos, InputStream is) throws SQLException {
 
         BufferedInputStream bis = new BufferedInputStream(is);
         AtomicInteger transferredBytes = new AtomicInteger(0);
@@ -58,6 +59,7 @@ public class LobServiceImpl implements LobService {
                 }
                 transferredBytes.set(transferredBytes.get() + (MAX_LOB_DATA_BLOCK_SIZE));
                 return LobDataBlock.newBuilder()
+                        .setLobType(lobType)
                         .setSession(connection.getSession())
                         .setPosition((transferredBytes.get() + pos) - MAX_LOB_DATA_BLOCK_SIZE)
                         .setData(ByteString.copyFrom(bytesRead))

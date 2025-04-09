@@ -219,7 +219,10 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public Clob createClob() throws SQLException {
-        return null;
+        return new org.openjdbcproxy.jdbc.Clob(this, new LobServiceImpl(this, this.statementService),
+                this.statementService,
+                null
+        );
     }
 
     @Override
