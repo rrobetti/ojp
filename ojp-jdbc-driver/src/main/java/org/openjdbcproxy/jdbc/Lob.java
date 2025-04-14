@@ -5,6 +5,7 @@ import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.LobType;
 import io.grpc.StatusRuntimeException;
+import lombok.SneakyThrows;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.io.IOException;
@@ -14,6 +15,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -49,7 +51,7 @@ public class Lob {
         return 0; //TODO implement
     }
 
-    protected OutputStream setBynaryStream(LobType lobType, long pos) {
+    protected OutputStream setBinaryStream(LobType lobType, long pos) {
         try {
             //connect the pipes. Makes the OutputStream written by the caller feed into the InputStream read by the sender.
             PipedInputStream in = new PipedInputStream();
@@ -79,15 +81,41 @@ public class Lob {
         }
     }
 
-    protected void haveBlobReferenceValidation() throws SQLException {
-        if (this.lobReference == null) {
+    //TODO see if I can use it like this, or should I implement it directly in the PreparedStatement?
+    //TODO I think I need to break the executeUpdate and executeQuery in server side in two phases prepare and execute
+    //but only call twice in this scenario where I need the PreparedStatement created to be able to set bytes
+    protected LobReference sendBinaryStream(LobType lobType, InputStream inputStream, Map<Integer, Object> metadata) {
+        try {
+            try {
+                this.lobReference.set(this.lobService.sendBytes(lobType, 1, inputStream, metadata));
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            //Refresh Session object. Will wait until lobReference is set to progress.
+            try {
+                this.connection.setSession(this.lobReference.get().getSession());
+                return this.lobReference.get();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);//TODO review
+            } catch (ExecutionException e) {
+                throw new RuntimeException(e);//TODO review
+            }
+        } catch (Exception e) {
+            e.printStackTrace();//TODO treat exception
+            throw new RuntimeException(e);
+        }
+    }
+
+    @SneakyThrows
+    protected void haveLobReferenceValidation() throws SQLException {
+        if (this.lobReference.get() == null) {
             throw new SQLException("No reference to a LOB object found.");
         }
     }
 
     protected InputStream getBinaryStream(long pos, long length) throws SQLException {
         try {
-            this.haveBlobReferenceValidation();
+            this.haveLobReferenceValidation();
 
             return new InputStream() {
                 private InputStream currentBlockInputStream;

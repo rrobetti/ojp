@@ -59,9 +59,19 @@ public class StatementServiceGrpcClient implements StatementService {
 
     @Override
     public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException {
+        return this.executeUpdate(sessionInfo, sql, params, "");
+    }
+
+    @Override
+    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params, String preparedStatementUUID)
+            throws SQLException {
         try {
             return this.statemetServiceBlockingStub.executeUpdate(StatementRequest.newBuilder()
-                    .setSession(sessionInfo).setSql(sql).setParameters(ByteString.copyFrom(serialize(params))).build());
+                    .setSession(sessionInfo)
+                    .setPreparedStatementUUID(preparedStatementUUID != null ? preparedStatementUUID : "")
+                    .setSql(sql)
+                    .setParameters(ByteString.copyFrom(serialize(params)))
+                    .build());
         } catch (StatusRuntimeException e) {
             throw handle(e);
         }
@@ -283,7 +293,7 @@ public class StatementServiceGrpcClient implements StatementService {
 
     @Override
     public void terminateSession(SessionInfo session) {
-        //Fire and forget
+        //Fire and forget - done async intentionally to improve client performance.
         this.statemetServiceStub.terminateSession(session, new ServerCallStreamObserver<>() {
             @Override
             public boolean isCancelled() {
@@ -339,13 +349,45 @@ public class StatementServiceGrpcClient implements StatementService {
                         t = e;
                     }
                 }
-                log.error("Error while closing session: " + t.getMessage(), t);
+                log.error("Error while terminating session: " + t.getMessage(), t);
             }
 
             @Override
             public void onCompleted() {
-                int i = 0;
             }
         });
+    }
+
+    @Override
+    public SessionInfo startTransaction(SessionInfo session) throws SQLException {
+        try {
+            return this.statemetServiceBlockingStub.startTransaction(session);
+        } catch (StatusRuntimeException e) {
+            throw handle(e);
+        } catch (Exception e) {
+            throw new SQLException("Unable to start a new transaction: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public SessionInfo commitTransaction(SessionInfo session) throws SQLException {
+        try {
+            return this.statemetServiceBlockingStub.commitTransaction(session);
+        } catch (StatusRuntimeException e) {
+            throw handle(e);
+        } catch (Exception e) {
+            throw new SQLException("Unable to commit transaction: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public SessionInfo rollbackTransaction(SessionInfo session) throws SQLException {
+        try {
+            return this.statemetServiceBlockingStub.rollbackTransaction(session);
+        } catch (StatusRuntimeException e) {
+            throw handle(e);
+        } catch (Exception e) {
+            throw new SQLException("Unable to rollback transaction: " + e.getMessage(), e);
+        }
     }
 }

@@ -1,7 +1,7 @@
 package org.openjdbcproxy.jdbc;
 
-import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.SessionInfo;
+import com.openjdbcproxy.grpc.TransactionStatus;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +29,7 @@ public class Connection implements java.sql.Connection {
     @Setter
     private SessionInfo session;
     private final StatementService statementService;
+    private boolean autoCommit = true;
 
     public Connection(SessionInfo session, StatementService statementService) {
         this.session = session;
@@ -57,28 +58,42 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public void setAutoCommit(boolean autoCommit) throws SQLException {
+        //if switching on autocommit with active transaction, commit current transaction.
+        if (!this.autoCommit && autoCommit &&
+                TransactionStatus.TRX_ACTIVE.equals(session.getTransactionInfo().getTransactionStatus())) {
+            this.session = this.statementService.commitTransaction(this.session);
+        //If switching autocommit off, start a new transaction
+        } else if (this.autoCommit && !autoCommit) {
+            this.session = this.statementService.startTransaction(this.session);
+        }
 
+        this.autoCommit = autoCommit;
     }
 
     @Override
     public boolean getAutoCommit() throws SQLException {
-        return false;
+        return this.autoCommit;
     }
 
     @Override
     public void commit() throws SQLException {
-
+        if (!this.autoCommit) {
+            this.session = this.statementService.commitTransaction(this.session);
+        }
     }
 
     @Override
     public void rollback() throws SQLException {
-
+        if (!this.autoCommit) {
+            this.session = this.statementService.rollbackTransaction(this.session);
+        }
     }
 
     @Override
     public void close() throws SQLException {
         if (StringUtils.isNotEmpty(this.session.getSessionUUID())) {
             this.statementService.terminateSession(this.session);
+            this.session = null;    
         }
     }
 

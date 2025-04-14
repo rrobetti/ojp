@@ -15,9 +15,9 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
     @ParameterizedTest
     @ValueSource(ints = {1,99,100,101,1000,10000})
     public void multiplePagesOfRowsResultSetSuccessful(int totalRecords) throws SQLException, ClassNotFoundException {
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
+        Class.forName("org.postgresql.Driver");
         Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+                getConnection("jdbc:postgresql:", "", "");
 
         try {
             this.executeUpdate(conn,
@@ -25,7 +25,7 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
                             drop table test_table_multi
                             """);
         } catch (Exception e) {
-            e.printStackTrace();
+            //Does not matter
         }
         this.executeUpdate(conn,
                 """

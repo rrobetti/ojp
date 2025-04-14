@@ -15,12 +15,12 @@ import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
-public class MultipleTypesIntegrationTest {
+public class H2MultipleTypesIntegrationTest {
 
     @Test
     public void typesCoverageTestSuccessful() throws SQLException, ClassNotFoundException, ParseException {
         Class.forName("org.openjdbcproxy.jdbc.Driver");
-        org.openjdbcproxy.jdbc.Connection conn = (org.openjdbcproxy.jdbc.Connection) DriverManager.
+        Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");
 
         try {

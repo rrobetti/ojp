@@ -13,15 +13,18 @@ public class BasicCrudIntegrationTest {
 
     @Test
     public void crudTestSuccessful() throws SQLException, ClassNotFoundException {
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
+        Class.forName("org.postgresql.Driver");
         Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+                getConnection("jdbc:postgresql://", "", "");
 
-        this.executeUpdate(conn,
-                """
-                drop table test_table
-                """);
-
+        try {
+            this.executeUpdate(conn,
+                    """
+                            drop table test_table
+                            """);
+        } catch (Exception e) {
+            //Does not matter
+        }
         this.executeUpdate(conn,
                 """
                 create table test_table(

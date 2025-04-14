@@ -21,9 +21,17 @@ public interface StatementService {
      * Open a new JDBC connection with the database if one does not yet exit.
      */
     SessionInfo connect(ConnectionDetails connectionDetails) throws SQLException;
+    //DML Operations
     OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException;
+    OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params, String preparedStatementUUID) throws SQLException;
     Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException;
+    //LOB (Large objects) management.
     LobReference createLob(Connection connection, Iterator<LobDataBlock> lobDataBlock) throws SQLException;
     Iterator<LobDataBlock> readLob(LobReference lobReference, long pos, int length) throws SQLException;
+    //Session management.
     void terminateSession(SessionInfo session);
+    //Transaction management.
+    SessionInfo startTransaction(SessionInfo session) throws SQLException;
+    SessionInfo commitTransaction(SessionInfo session) throws SQLException;
+    SessionInfo rollbackTransaction(SessionInfo session) throws SQLException;
 }

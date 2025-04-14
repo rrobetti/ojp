@@ -2,6 +2,7 @@ package org.openjdbcproxy.grpc.server;
 
 import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.SessionInfo;
+import com.openjdbcproxy.grpc.TransactionStatus;
 import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Blob;
@@ -68,7 +69,7 @@ public class SessionManagerImpl implements SessionManager{
     @Override
     public String registerPreparedStatement(SessionInfo sessionInfo, PreparedStatement ps) {
         String uuid = UUID.randomUUID().toString();
-        this.sessionMap.get(sessionInfo.getSessionUUID()).addStatement(uuid, ps);
+        this.sessionMap.get(sessionInfo.getSessionUUID()).addPreparedStatement(uuid, ps);
         return uuid;
     }
 
@@ -93,6 +94,11 @@ public class SessionManagerImpl implements SessionManager{
     public void terminateSession(SessionInfo sessionInfo) throws SQLException {
         System.out.println("Terminating session -> " + sessionInfo.getSessionUUID() );
         Session targetSession = this.sessionMap.remove(sessionInfo.getSessionUUID());
+
+        if (TransactionStatus.TRX_ACTIVE.equals(sessionInfo.getTransactionInfo().getTransactionStatus())) {
+            System.out.println("Rolling back active transaction");
+            targetSession.getConnection().rollback();
+        }
         targetSession.terminate();
     }
 }

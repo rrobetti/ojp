@@ -11,14 +11,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.sql.SQLException;
 import java.util.Iterator;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
-import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
 import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 
 public class Blob extends Lob implements java.sql.Blob {
@@ -29,7 +24,7 @@ public class Blob extends Lob implements java.sql.Blob {
     @Override
     public byte[] getBytes(long pos, int length) throws SQLException {
         try {
-            this.haveBlobReferenceValidation();
+            this.haveLobReferenceValidation();
             Iterator<LobDataBlock> dataBlocks = this.statementService.readLob(this.lobReference.get(), pos, length);
             InputStream is = this.lobService.parseReceivedBlocks(dataBlocks);
             BufferedInputStream bis = new BufferedInputStream(is);
@@ -83,7 +78,7 @@ public class Blob extends Lob implements java.sql.Blob {
 
     @Override
     public OutputStream setBinaryStream(long pos) throws SQLException {
-        return super.setBynaryStream(LobType.LT_BLOB, pos);
+        return super.setBinaryStream(LobType.LT_BLOB, pos);
     }
 
     @Override

@@ -9,11 +9,30 @@ message ConnectionDetails {
     string clientUUID = 4;
 }
 
+enum SessionStatus {
+    SESSION_ACTIVE = 0;
+    SESSION_TERMINATED = 1;
+}
+
+//TRX stands for transaction
+enum TransactionStatus {
+    TRX_ACTIVE = 0;
+    TRX_COMMITED = 1;
+    TRX_ROLLBACK = 2;
+}
+
+message TransactionInfo {
+    string transactionUUID = 1;
+    TransactionStatus transactionStatus = 2;
+}
+
 message SessionInfo {
     string connHash = 1;
     string clientUUID = 2;
     //only set if connection has to be the same among different requests, within transaction boundaries or when using LOB objects.
     string sessionUUID = 3;
+    TransactionInfo transactionInfo = 4;
+    SessionStatus sessionStatus = 5;
 }
 
 message ResultSetId {
@@ -35,6 +54,7 @@ message StatementRequest {
     SessionInfo session = 1;
     string sql = 2;
     bytes parameters = 3;
+    string preparedStatementUUID = 4;
 }
 
 message SqlErrorResponse {
@@ -43,9 +63,11 @@ message SqlErrorResponse {
     int32 vendorCode = 3;
 }
 
+//LT stands for Lob Type
 enum LobType {
     LT_BLOB = 0;
     LT_CLOB = 1;
+    LT_BINARY_STREAM = 2;
 }
 
 message LobReference {
@@ -53,6 +75,7 @@ message LobReference {
     string uuid = 2;
     int32 bytesWritten = 3;
     LobType lobType = 4;
+    int32 columnIndex = 5;//Only used to query Binary streams.
 }
 
 message ReadLobRequest {
@@ -66,6 +89,9 @@ message LobDataBlock {
     int64 position = 2;
     bytes data = 3;
     LobType lobType = 4;
+    bytes metadata = 5; // Used for Binary stream where the prepared statement has to be created before the execution to set the stream directly to it.
+    //TODO send metadata from client to server with sql and param index where to put the new binary stream return the
+    // uuid of the new prepared statement to use in the subsequent blocks and in the call to executeQuery or executeUpdate
 }
 
 message SessionTerminationStatus {
@@ -100,4 +126,7 @@ service StatementService {
     // --> I can relate the Blob to the resource it is being used on, if that or those resources all close I can close
     // the Blob and remove it from the session.
     rpc closeResource(CloseResourceRequest) returns (CloseResourceResponse);
+    rpc startTransaction(SessionInfo) returns (SessionInfo);
+    rpc commitTransaction(SessionInfo) returns (SessionInfo);
+    rpc rollbackTransaction(SessionInfo) returns (SessionInfo);
 }

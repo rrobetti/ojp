@@ -1,10 +1,12 @@
 package org.openjdbcproxy.jdbc;
 
+import com.openjdbcproxy.grpc.LobReference;
+import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
+import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
-import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -26,8 +28,10 @@ import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -35,7 +39,6 @@ import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.grpc.dto.ParameterType.ARRAY;
 import static org.openjdbcproxy.grpc.dto.ParameterType.ASCII_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.BIG_DECIMAL;
-import static org.openjdbcproxy.grpc.dto.ParameterType.BINARY_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.BLOB;
 import static org.openjdbcproxy.grpc.dto.ParameterType.BOOLEAN;
 import static org.openjdbcproxy.grpc.dto.ParameterType.BYTE;
@@ -61,13 +64,13 @@ import static org.openjdbcproxy.grpc.dto.ParameterType.TIME;
 import static org.openjdbcproxy.grpc.dto.ParameterType.TIMESTAMP;
 import static org.openjdbcproxy.grpc.dto.ParameterType.UNICODE_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.URL;
-import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
 
 public class PreparedStatement implements java.sql.PreparedStatement {
     private final Connection connection;
     private String sql;
     private SortedMap<Integer, Parameter> paramsMap;
     private StatementService statementService;
+    private String uuid;//If present represents the UUID of this PreparedStatement in the server
 
     public PreparedStatement(Connection connection, String sql, StatementService statementService) {
         this.connection = connection;
@@ -85,7 +88,8 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
-        OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList());
+        OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
+                this.paramsMap.values().stream().toList(), this.uuid);
         this.connection.setSession(result.getSession());
         return deserialize(result.getValue().toByteArray(), Integer.class);
     }
@@ -95,6 +99,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(NULL)
+                        .index(parameterIndex)
                         .build());
     }
 
@@ -103,6 +108,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BOOLEAN)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -112,6 +118,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BYTE)
+                        .index(parameterIndex)
                         .values(List.of(new byte[]{x}))//Transform to byte array as it becomes an Object facilitating serialization.
                         .build());
     }
@@ -121,6 +128,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(SHORT)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -130,6 +138,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(INT)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -139,6 +148,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(LONG)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -148,6 +158,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(FLOAT)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -157,6 +168,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DOUBLE)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -166,6 +178,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BIG_DECIMAL)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -175,6 +188,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(STRING)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -184,6 +198,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BYTES)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -193,6 +208,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DATE)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -202,6 +218,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIME)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -209,7 +226,11 @@ public class PreparedStatement implements java.sql.PreparedStatement {
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
         this.paramsMap.put(parameterIndex,
-                Parameter.builder().type(TIMESTAMP).values(List.of(x)).build());
+                Parameter.builder()
+                        .type(TIMESTAMP)
+                        .index(parameterIndex)
+                        .values(List.of(x))
+                        .build());
     }
 
     @Override
@@ -217,6 +238,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ASCII_STREAM)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -226,17 +248,14 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(UNICODE_STREAM)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
 
     @Override
-    public void setBinaryStream(int parameterIndex, InputStream x, int length) throws SQLException {
-        this.paramsMap.put(parameterIndex,
-                Parameter.builder()
-                        .type(BINARY_STREAM)
-                        .values(List.of(x))
-                        .build());
+    public void setBinaryStream(int parameterIndex, InputStream inputStream, int length) throws SQLException {
+        this.setBinaryStream(parameterIndex, inputStream, (long) length);
     }
 
     @Override
@@ -249,6 +268,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
+                        .index(parameterIndex)
                         .values(List.of(x, targetSqlType))
                         .build());
     }
@@ -258,6 +278,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -278,6 +299,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(CHARACTER_READER)
+                        .index(parameterIndex)
                         .values(List.of(reader, length))
                         .build());
     }
@@ -287,6 +309,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(REF)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -297,6 +320,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BLOB)
+                        .index(parameterIndex)
                         .values(List.of(blobUUID)) //Only send the Id as per the blob has been streamed in advance.
                         .build());
     }
@@ -307,6 +331,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(CLOB)
+                        .index(parameterIndex)
                         .values(List.of(clobUUID))
                         .build());
     }
@@ -316,6 +341,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ARRAY)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -330,6 +356,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DATE)
+                        .index(parameterIndex)
                         .values(List.of(x, cal))
                         .build());
     }
@@ -339,6 +366,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIME)
+                        .index(parameterIndex)
                         .values(List.of(x, cal))
                         .build());
     }
@@ -348,6 +376,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIMESTAMP)
+                        .index(parameterIndex)
                         .values(List.of(x, cal))
                         .build());
     }
@@ -357,6 +386,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(NULL)
+                        .index(parameterIndex)
                         .values(List.of(sqlType, typeName))
                         .build());
     }
@@ -366,6 +396,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(URL)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -380,6 +411,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ROW_ID)
+                        .index(parameterIndex)
                         .values(List.of(x))
                         .build());
     }
@@ -389,6 +421,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_STRING)
+                        .index(parameterIndex)
                         .values(List.of(value))
                         .build());
     }
@@ -399,6 +432,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_CHARACTER_STREAM)
+                        .index(parameterIndex)
                         .values(List.of(value, length))
                         .build());
     }
@@ -408,6 +442,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_CLOB)
+                        .index(parameterIndex)
                         .values(List.of(value))
                         .build());
     }
@@ -428,6 +463,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
             this.paramsMap.put(parameterIndex,
                     Parameter.builder()
                             .type(CLOB)
+                            .index(parameterIndex)
                             .values(List.of(clob.getUUID()))
                             .build()
             );
@@ -452,6 +488,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
             this.paramsMap.put(parameterIndex,
                     Parameter.builder()
                             .type(BLOB)
+                            .index(parameterIndex)
                             .values(List.of(blob.getUUID()))
                             .build()
             );
@@ -466,6 +503,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_CLOB)
+                        .index(parameterIndex)
                         .values(List.of(reader, length))
                         .build());
     }
@@ -475,6 +513,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(SQL_XML)
+                        .index(parameterIndex)
                         .values(List.of(xmlObject))
                         .build());
     }
@@ -484,6 +523,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
+                        .index(parameterIndex)
                         .values(List.of(x, targetSqlType, scaleOrLength))
                         .build());
     }
@@ -493,17 +533,27 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ASCII_STREAM)
+                        .index(parameterIndex)
                         .values(List.of(x, length))
                         .build());
     }
 
     @Override
-    public void setBinaryStream(int parameterIndex, InputStream x, long length) throws SQLException {
-        this.paramsMap.put(parameterIndex,
-                Parameter.builder()
-                        .type(BINARY_STREAM)
-                        .values(List.of(x, length))
-                        .build());
+    public void setBinaryStream(int parameterIndex, InputStream is, long length) throws SQLException {
+        try {
+            BinaryStream binaryStream = new BinaryStream(this.getConnection(),
+                    new LobServiceImpl(this.connection, this.statementService),
+                    this.statementService, null);
+            Map<Integer, Object> metadata = new HashMap<>();
+            metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_INDEX, parameterIndex);
+            metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_LENGTH, length);
+            metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_SQL, this.sql);
+            metadata.put(CommonConstants.PREPARED_STATEMENT_UUID_BINARY_STREAM, this.uuid);
+            LobReference lobReference = binaryStream.sendBinaryStream(LobType.LT_BINARY_STREAM, is, metadata);
+            this.uuid = lobReference.getUuid();//Lob reference UUID for binary streams is the prepared statement uuid.
+        } catch (RuntimeException e) {
+            throw new SQLException("Unable to write binary stream: " + e.getMessage(), e);
+        }
     }
 
     @Override
@@ -517,7 +567,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
-
+        this.setBinaryStream(parameterIndex, x, -1); //-1 means not provided in OJP BynaryStrem server side
     }
 
     @Override

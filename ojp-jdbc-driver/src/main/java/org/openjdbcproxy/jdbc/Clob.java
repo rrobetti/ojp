@@ -72,12 +72,12 @@ public class Clob extends Lob implements java.sql.Clob {
 
     @Override
     public OutputStream setAsciiStream(long pos) throws SQLException {
-        return this.setBynaryStream(LobType.LT_CLOB, pos);
+        return this.setBinaryStream(LobType.LT_CLOB, pos);
     }
 
     @Override
     public Writer setCharacterStream(long pos) throws SQLException {
-        OutputStream os = this.setBynaryStream(LobType.LT_CLOB, pos);
+        OutputStream os = this.setBinaryStream(LobType.LT_CLOB, pos);
         return new OutputStreamWriter(os);
     }
 

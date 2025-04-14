@@ -9,6 +9,7 @@ import java.util.List;
 @Data
 @Builder
 public class Parameter implements Serializable {
+    private Integer index;
     private ParameterType type;
     private List<Object> values;
 }

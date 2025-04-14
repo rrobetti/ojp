@@ -14,10 +14,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-public class BLOBIntegrationTest {
+public class H2BLOBIntegrationTest {
 
     @Test
-    public void creatinAndReadingBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
+    public void createAndReadingBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp_h2:~/test", "sa", "");

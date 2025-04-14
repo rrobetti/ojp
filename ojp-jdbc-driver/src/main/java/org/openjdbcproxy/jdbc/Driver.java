@@ -41,8 +41,8 @@ public class Driver implements java.sql.Driver {
         SessionInfo sessionInfo = this.statementService
                 .connect(ConnectionDetails.newBuilder()
                         .setUrl(url)
-                        .setUser((String) info.get(USER))
-                        .setPassword((String) info.get(PASSWORD))
+                        .setUser((String) ((info.get(USER) != null)? info.get(USER) : ""))
+                        .setPassword((String) ((info.get(PASSWORD) != null) ? info.get(PASSWORD) : ""))
                         .setClientUUID(ClientUUID.getUUID())
                         .build()
                 );

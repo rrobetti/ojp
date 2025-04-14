@@ -14,9 +14,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
+import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 
 @AllArgsConstructor
 public class LobServiceImpl implements LobService {
@@ -26,9 +28,17 @@ public class LobServiceImpl implements LobService {
 
     @Override
     public LobReference sendBytes(LobType lobType, long pos, InputStream is) throws SQLException {
+        return this.sendBytes(lobType, pos, is, null);
+    }
+
+
+    @Override
+    public LobReference sendBytes(LobType lobType, long pos, InputStream is, Map<Integer, Object> metadata) throws SQLException {
 
         BufferedInputStream bis = new BufferedInputStream(is);
         AtomicInteger transferredBytes = new AtomicInteger(0);
+
+        byte[] metadataBytes = (metadata == null) ? new byte[]{} : serialize(metadata);
 
         Iterator<LobDataBlock> itLobDataBlocks = new Iterator<LobDataBlock>() {
 
@@ -63,6 +73,7 @@ public class LobServiceImpl implements LobService {
                         .setSession(connection.getSession())
                         .setPosition((transferredBytes.get() + pos) - MAX_LOB_DATA_BLOCK_SIZE)
                         .setData(ByteString.copyFrom(bytesRead))
+                        .setMetadata(ByteString.copyFrom(metadataBytes))
                         .build();
             }
         };

@@ -10,4 +10,5 @@ public class Constants {
     public static final String OJP_DRIVER_PREFIX = "ojp_";
     public static final String EMPTY_STRING = "";
     public static final String H2_DRIVER_CLASS = "org.h2.Driver";
+    public static final String POSTGRES_DRIVER_CLASS = "org.postgresql.Driver";
 }

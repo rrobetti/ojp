@@ -3,12 +3,15 @@ package org.openjdbcproxy.jdbc;
 import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
+import com.openjdbcproxy.grpc.SessionInfo;
 import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 
+import java.io.BufferedInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -47,15 +50,19 @@ public class ResultSet implements java.sql.ResultSet {
     private AtomicInteger blockIdx = new AtomicInteger(-1);
     private AtomicInteger blockCount = new AtomicInteger(1);
     private java.sql.Statement statement;
+    private String resultSetUUID;
+    private SessionInfo session;
 
     public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService, java.sql.Statement statement) throws SQLException {
         this.itResults = itOpResult;
         try {
             this.statement = statement;
             OpResult result = nextWithSessionUpdate(itOpResult.next());
+            this.session = result.getSession();
             OpQueryResult opQueryResult = deserialize(result.getValue().toByteArray(), OpQueryResult.class);
 
             this.statementService = statementService;
+            this.resultSetUUID = opQueryResult.getResultSetUUID();
             this.currentDataBlock = opQueryResult.getRows();
             this.labelsMap = new HashMap<>();
             List<String> labels = opQueryResult.getLabels();
@@ -113,7 +120,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public byte getByte(int columnIndex) throws SQLException {
-        return ((byte[]) currentDataBlock.get(blockIdx.get())[columnIndex -1])[0];
+        return (byte) currentDataBlock.get(blockIdx.get())[columnIndex -1];
     }
 
     @Override
@@ -178,7 +185,18 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public InputStream getBinaryStream(int columnIndex) throws SQLException {
-        throw new RuntimeException("Not implemented");
+        Object objUUID = currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        String lobRefUUID = String.valueOf(objUUID);
+        BinaryStream binaryStream = new BinaryStream((Connection) this.statement.getConnection(),
+                new LobServiceImpl((Connection) this.statement.getConnection(), this.statementService),
+                this.statementService,
+                LobReference.newBuilder()
+                        .setSession(this.session)
+                        .setLobType(LobType.LT_BINARY_STREAM)
+                        .setUuid(lobRefUUID)
+                        .setColumnIndex(columnIndex)
+                        .build());
+        return binaryStream.getBinaryStream();
     }
 
     @Override
@@ -193,7 +211,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public byte getByte(String columnLabel) throws SQLException {
-        return ((byte[]) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())])[0];
+        return (byte) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
     }
 
     @Override
@@ -258,7 +276,7 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public InputStream getBinaryStream(String columnLabel) throws SQLException {
-        throw new RuntimeException("Not implemented");
+        return this.getBinaryStream(this.labelsMap.get(columnLabel.toUpperCase()) + 1);
     }
 
     @Override
@@ -663,7 +681,8 @@ public class ResultSet implements java.sql.ResultSet {
 
     @Override
     public Blob getBlob(int columnIndex) throws SQLException {
-        String blobRefUUID = (String) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        Object objUUID = currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        String blobRefUUID = String.valueOf(objUUID);
         return new org.openjdbcproxy.jdbc.Blob((Connection) this.statement.getConnection(),
                 new LobServiceImpl((Connection) this.statement.getConnection(), this.statementService),
                 this.statementService,

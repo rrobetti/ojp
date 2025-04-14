@@ -102,6 +102,7 @@ public class Session {
     }
 
     public void terminate() throws SQLException {
+
         //Free all blobs
         for (Object o : this.lobMap.values()) {
             try {
