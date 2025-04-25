@@ -7,19 +7,24 @@ import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.LobType;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
+import static org.openjdbcproxy.constants.CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_LENGTH;
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 
+@Slf4j
 @AllArgsConstructor
 public class LobServiceImpl implements LobService {
 
@@ -28,16 +33,18 @@ public class LobServiceImpl implements LobService {
 
     @Override
     public LobReference sendBytes(LobType lobType, long pos, InputStream is) throws SQLException {
-        return this.sendBytes(lobType, pos, is, null);
+        return this.sendBytes(lobType, pos, is, new HashMap<>());
     }
 
 
+    @SneakyThrows
     @Override
     public LobReference sendBytes(LobType lobType, long pos, InputStream is, Map<Integer, Object> metadata) throws SQLException {
 
         BufferedInputStream bis = new BufferedInputStream(is);
         AtomicInteger transferredBytes = new AtomicInteger(0);
-
+        long length = metadata.get(PREPARED_STATEMENT_BINARY_STREAM_LENGTH) != null ?
+                (Long) metadata.get(PREPARED_STATEMENT_BINARY_STREAM_LENGTH) : -1l;
         byte[] metadataBytes = (metadata == null) ? new byte[]{} : serialize(metadata);
 
         Iterator<LobDataBlock> itLobDataBlocks = new Iterator<LobDataBlock>() {
@@ -68,13 +75,27 @@ public class LobServiceImpl implements LobService {
                     bytesRead = bis.readNBytes(MAX_LOB_DATA_BLOCK_SIZE);
                 }
                 transferredBytes.set(transferredBytes.get() + (MAX_LOB_DATA_BLOCK_SIZE));
+                long updatedPosition = (transferredBytes.get() + pos) - MAX_LOB_DATA_BLOCK_SIZE;
+                log.info("Sending the next block of bytes updatedPosition: {}", updatedPosition);
+
+                bytesRead = this.maxLengthTrim(bytesRead, length, (updatedPosition + bytesRead.length - 1));
+
                 return LobDataBlock.newBuilder()
                         .setLobType(lobType)
                         .setSession(connection.getSession())
-                        .setPosition((transferredBytes.get() + pos) - MAX_LOB_DATA_BLOCK_SIZE)
+                        .setPosition(updatedPosition)
                         .setData(ByteString.copyFrom(bytesRead))
                         .setMetadata(ByteString.copyFrom(metadataBytes))
                         .build();
+            }
+
+            private byte[] maxLengthTrim(byte[] bytesRead, long length, long bytesSendCount) {
+                if (length == -1 || bytesSendCount <= length) {
+                    return bytesRead;
+                }
+                int diff = (int) (bytesSendCount - length);
+                int currentSize = bytesRead.length;
+                return Arrays.copyOfRange(bytesRead, 0, (currentSize - diff));
             }
         };
 
@@ -90,6 +111,9 @@ public class LobServiceImpl implements LobService {
 
             @Override
             public int read() throws IOException {
+                if (currentPos == 2048) {
+                    int i = 0;
+                }
                 if (currentBlock == null || currentPos >= (currentBlock.length - 1)) {
                     if (!itBlocks.hasNext()) {
                         return -1;// -1 means end of the stream.

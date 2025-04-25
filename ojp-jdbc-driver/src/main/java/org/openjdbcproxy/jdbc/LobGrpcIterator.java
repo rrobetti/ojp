@@ -17,7 +17,7 @@ import java.util.concurrent.TimeoutException;
  * IMPORTANT: can only be consumed once as per the data is removed from memory once consumed.
  */
 public class LobGrpcIterator implements Iterator<LobDataBlock> {
-    private List<LobDataBlock> blocksReceived = Collections.synchronizedList(new ArrayList<>());
+    private final List<LobDataBlock> blocksReceived = Collections.synchronizedList(new ArrayList<>());
     private boolean finished = false;
     @Setter
     private Throwable error;

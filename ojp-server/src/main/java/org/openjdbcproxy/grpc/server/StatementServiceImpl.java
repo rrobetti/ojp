@@ -22,6 +22,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openjdbcproxy.constants.CommonConstants;
@@ -46,6 +47,7 @@ import java.sql.Time;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +67,7 @@ import static org.openjdbcproxy.grpc.server.Constants.POSTGRES_DRIVER_CLASS;
 import static org.openjdbcproxy.grpc.server.Constants.SHA_256;
 import static org.openjdbcproxy.grpc.server.GrpcExceptionHandler.sendSQLExceptionMetadata;
 
+@Slf4j
 @RequiredArgsConstructor
 public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceImplBase {
 
@@ -85,7 +88,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void connect(ConnectionDetails connectionDetails, StreamObserver<SessionInfo> responseObserver) {
         String connHash = hashConnectionDetails(connectionDetails);
-        System.out.println("connect connHash = " + connHash);
+        log.info("connect connHash = " + connHash);
 
         HikariDataSource ds = this.datasourceMap.get(connHash);
         if (ds == null) {
@@ -96,8 +99,8 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             config.addDataSourceProperty("cachePrepStmts", "true");
             config.addDataSourceProperty("prepStmtCacheSize", "250");
             config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-            config.addDataSourceProperty("maximumPoolSize", 1);
-            config.addDataSourceProperty("minimumPoolSize", 1);
+            config.addDataSourceProperty("maximumPoolSize", 5);
+            config.addDataSourceProperty("minimumPoolSize", 2);
             ds = new HikariDataSource(config);
 
             this.datasourceMap.put(connHash, ds);
@@ -113,52 +116,67 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         responseObserver.onCompleted();
     }
 
+    @SneakyThrows
     @Override
     public void executeUpdate(StatementRequest request, StreamObserver<OpResult> responseObserver) {
-        Integer updated = 0;
+        log.info("Executing update {}", request.getSql());
+        int updated = 0;
         SessionInfo returnSessionInfo = request.getSession();
+        ConnectionSessionDTO dto = ConnectionSessionDTO.builder().build();
+
+        Statement stmt = null;
 
         try {
-            ConnectionSessionDTO dto = sessionConnection(request.getSession(), false);
-            Statement stmt = null;
-            try {
-                List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
-                if (CollectionUtils.isNotEmpty(params) || StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
-                    PreparedStatement ps;
-                    if (StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
-                        ps = sessionManager.getPreparedStatement(dto.getSession(), request.getPreparedStatementUUID());
-                    } else {
-                        ps = this.createPreparedStatement(dto, request.getSql(), params);
+            dto = sessionConnection(request.getSession(), false);
+
+            List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
+            if (CollectionUtils.isNotEmpty(params) || StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
+                PreparedStatement ps;
+                if (StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
+                    ps = sessionManager.getPreparedStatement(dto.getSession(), request.getPreparedStatementUUID());
+                    Collection<Object> lobs = sessionManager.getLobs(dto.getSession());
+                    for (Object o : lobs) {
+                        LobDataBlocksInputStream lobIS = (LobDataBlocksInputStream) o;
+                        Map<String, Object> metadata = (Map<String, Object>) sessionManager.getAttr(dto.getSession(), lobIS.getUuid());
+                        Integer parameterIndex = (Integer) metadata.get(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_INDEX);
+                        ps.setBinaryStream(parameterIndex, lobIS);
                     }
-                    updated = ps.executeUpdate();
-                    stmt = ps;
+                    sessionManager.waitLobStreamsConsumption(dto.getSession());
                 } else {
-                    stmt = dto.getConnection().createStatement();
-                    updated = stmt.executeUpdate(request.getSql());
+                    ps = this.createPreparedStatement(dto, request.getSql(), params);
                 }
-            } catch (SQLException e) {
-                sendSQLExceptionMetadata(e, responseObserver);
-            } finally {
-                //If there is no session, close statement and connection
-                if (StringUtils.isEmpty(dto.getSession().getSessionUUID())) {
-                    assert stmt != null;
+                updated = ps.executeUpdate();
+                stmt = ps;
+            } else {
+                stmt = dto.getConnection().createStatement();
+                updated = stmt.executeUpdate(request.getSql());
+            }
+
+            responseObserver.onNext(OpResult.newBuilder()
+                    .setType(ResultType.INTEGER)
+                    .setSession(returnSessionInfo)
+                    .setValue(ByteString.copyFrom(serialize(updated))).build());
+            responseObserver.onCompleted();
+        } catch (SQLException e) {// Need a second catch just for the acquisition of the connection
+            log.error("Failure during update execution: " + e.getMessage(), e);
+            sendSQLExceptionMetadata(e, responseObserver);
+        } finally {
+            //If there is no session, close statement and connection
+            if (dto.getSession() == null || StringUtils.isEmpty(dto.getSession().getSessionUUID())) {
+                assert stmt != null;
+                try {
                     stmt.close();
-                    dto.getConnection().close();
+                    stmt.getConnection().close();
+                } catch (SQLException e) {
+                    log.error("Failure closing statement or connection: " + e.getMessage(), e);
                 }
             }
-        } catch (SQLException e) {// Need a second catch just for the acquisition of the connection
-            sendSQLExceptionMetadata(e, responseObserver);
         }
-
-        responseObserver.onNext(OpResult.newBuilder()
-                .setType(ResultType.INTEGER)
-                .setSession(returnSessionInfo)
-                .setValue(ByteString.copyFrom(serialize(updated))).build());
-        responseObserver.onCompleted();
     }
 
     private PreparedStatement createPreparedStatement(ConnectionSessionDTO dto, String sql, List<Parameter> params)
             throws SQLException {
+        log.info("Creating prepared statement for {}", sql);
         PreparedStatement ps = dto.getConnection().prepareStatement(sql);
         for (int i = 0; i < params.size(); i++) {
             Parameter parameter = params.get(i);
@@ -169,7 +187,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void executeQuery(StatementRequest request, StreamObserver<OpResult> responseObserver) {
-
+        log.info("Executing query for {}", request.getSql());
         try {
             ConnectionSessionDTO dto = this.sessionConnection(request.getSession(), true);
 
@@ -186,13 +204,14 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
 
         } catch (SQLException e) {
+            log.error("Failure during query execution: " + e.getMessage(), e);
             sendSQLExceptionMetadata(e, responseObserver);
         }
     }
 
     @Override
     public StreamObserver<LobDataBlock> createLob(StreamObserver<LobReference> responseObserver) {
-
+        log.info("Creating LOB");
         return new ServerCallStreamObserver<>() {
             private SessionInfo sessionInfo;
             private String lobUUID;
@@ -245,15 +264,18 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             public void onNext(LobDataBlock lobDataBlock) {
                 try {
                     this.lobType = lobDataBlock.getLobType();
+                    log.info("lob data block received, lob type {}", this.lobType);
                     ConnectionSessionDTO dto = sessionConnection(lobDataBlock.getSession(), true);
                     Connection conn = dto.getConnection();
                     if (StringUtils.isEmpty(lobDataBlock.getSession().getSessionUUID()) || this.lobUUID == null) {
                         if (LobType.LT_BLOB.equals(this.lobType)) {
                             Blob newBlob = conn.createBlob();
-                            this.lobUUID = sessionManager.registerLob(dto.getSession(), newBlob);
+                            this.lobUUID = UUID.randomUUID().toString();
+                            sessionManager.registerLob(dto.getSession(), newBlob, this.lobUUID);
                         } else if (LobType.LT_CLOB.equals(this.lobType)) {
                             Clob newClob = conn.createClob();
-                            this.lobUUID = sessionManager.registerLob(dto.getSession(), newClob);
+                            this.lobUUID = UUID.randomUUID().toString();
+                            sessionManager.registerLob(dto.getSession(), newClob, this.lobUUID);
                         }
                     }
 
@@ -288,30 +310,14 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                                     ps = dto.getConnection().prepareStatement(sql);
                                     lobUUID = sessionManager.registerPreparedStatement(dto.getSession(), ps);
                                 }
-                                //Need to first send the reff to the client before adding the stream as a parameter
+                                //Need to first send the ref to the client before adding the stream as a parameter
                                 sendLobRef(dto, lobDataBlock.getData().toByteArray().length);
 
                                 //Add bite stream as parameter to the prepared statement
                                 lobDataBlocksInputStream = new LobDataBlocksInputStream(lobDataBlock);
-                                Integer parameterIndex = (Integer) metadata.get(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_INDEX);
-                                Long length = (Long) metadata.get(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_LENGTH);
-                                List<Object> values = new ArrayList<>();
-                                values.add(lobDataBlocksInputStream);
-                                if (length > -1) {
-                                    values.add(length);
-                                }
-                                Parameter parameter = Parameter.builder()
-                                        .index(parameterIndex)
-                                        .type(ParameterType.BINARY_STREAM)
-                                        .values(values)
-                                        .build();
-                                CompletableFuture.runAsync(() -> {
-                                    try {
-                                        addParam(dto.getSession(), parameter.getIndex(), ps, parameter);
-                                    } catch (SQLException e) {
-                                        throw new RuntimeException(e);
-                                    }
-                                });
+                                //Only needs to be registered so we can wait it to receive all bytes before performing the update.
+                                sessionManager.registerLob(dto.getSession(), lobDataBlocksInputStream, lobDataBlocksInputStream.getUuid());
+                                sessionManager.registerAttr(dto.getSession(), lobDataBlocksInputStream.getUuid(), metadata);
                             } else {
                                 lobDataBlocksInputStream.addBlock(lobDataBlock);
                             }
@@ -332,6 +338,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
 
             private void sendLobRef(ConnectionSessionDTO dto, int bytesWritten) {
+                log.info("Returning lob ref {}", this.lobUUID);
                 //Send one flag response to indicate that the Blob has been created successfully and the first
                 // block fo data has been written successfully.
                 responseObserver.onNext(LobReference.newBuilder()
@@ -346,6 +353,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
             @Override
             public void onError(Throwable throwable) {
+                log.error("Failure lob stream: " + throwable.getMessage(), throwable);
                 if (lobDataBlocksInputStream != null) {
                     lobDataBlocksInputStream.finish(true);
                 }
@@ -354,7 +362,10 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             @Override
             public void onCompleted() {
                 if (lobDataBlocksInputStream != null) {
-                    lobDataBlocksInputStream.finish(true);
+                    CompletableFuture.runAsync(() -> {
+                        log.info("Finishing lob stream for lob ref {}", this.lobUUID);
+                        lobDataBlocksInputStream.finish(true);
+                    });
                 }
                 //Send the final Lob reference with total count of written bytes.
                 responseObserver.onNext(LobReference.newBuilder()
@@ -371,6 +382,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void readLob(ReadLobRequest request, StreamObserver<LobDataBlock> responseObserver) {
+        log.info("Reading lob {}", request.getLobReference().getUuid());
         try {
             LobReference lobRef = request.getLobReference();
             ReadLobContext readLobContext = this.findLobContext(request);
@@ -382,29 +394,39 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             byte[] nextBlock = new byte[nextBlockSize];
             int idx = -1;
             int currentPos = (int) request.getPosition();
+            boolean nextBlockFullyEmpty = false;
             while (nextByte != -1) {
                 nextBlock[++idx] = (byte) nextByte;
+                nextBlockFullyEmpty = false;
                 if (idx == nextBlockSize - 1) {
-                    currentPos += idx;
+                    currentPos += (idx + 1);
+                    log.info("Sending block of data size {} pos {}", idx + 1, currentPos);
                     //Send data to client in limited size blocks to safeguard server memory.
                     responseObserver.onNext(LobDataBlock.newBuilder()
                             .setSession(lobRef.getSession())
-                            .setPosition(currentPos + 1)
+                            .setPosition(currentPos)
                             .setData(ByteString.copyFrom(nextBlock))
                             .build()
                     );
-                    nextBlockSize = this.nextBlockSize(readLobContext, currentPos);
-                    nextBlock = new byte[nextBlockSize];
+                    nextBlockSize = this.nextBlockSize(readLobContext, currentPos - 1);
+                    if (nextBlockSize > 0) {//Might be a single small block then nextBlockSize will return negative.
+                        nextBlock = new byte[nextBlockSize];
+                    } else {
+                        nextBlock = new byte[0];
+                    }
+                    nextBlockFullyEmpty = true;
                     idx = -1;
                 }
                 nextByte = inputStream.read();
             }
 
             //Send leftover bytes
-            if (nextBlock.length > 0 && nextBlock[0] != -1) {
+            if (!nextBlockFullyEmpty && nextBlock.length > 0 && nextBlock[0] != -1) {
+
                 byte[] adjustedSizeArray = (idx % MAX_LOB_DATA_BLOCK_SIZE != 0 && !exactSizeKnown) ?
                         trim(nextBlock) : nextBlock;
                 currentPos = (int) request.getPosition() + idx;
+                log.info("Sending leftover bytes size {} pos {}", idx, currentPos);
                 responseObserver.onNext(LobDataBlock.newBuilder()
                         .setSession(lobRef.getSession())
                         .setPosition(currentPos)
@@ -502,6 +524,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void terminateSession(SessionInfo sessionInfo, StreamObserver<SessionTerminationStatus> responseObserver) {
         try {
+            log.info("Terminating session");
             this.sessionManager.terminateSession(sessionInfo);
             responseObserver.onNext(SessionTerminationStatus.newBuilder().setTerminated(true).build());
             responseObserver.onCompleted();
@@ -514,7 +537,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void startTransaction(SessionInfo sessionInfo, StreamObserver<SessionInfo> responseObserver) {
-        System.out.println("Starting transaction");
+        log.info("Starting transaction");
         try {
             SessionInfo activeSessionInfo = sessionInfo;
 
@@ -546,7 +569,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void commitTransaction(SessionInfo sessionInfo, StreamObserver<SessionInfo> responseObserver) {
-        System.out.println("Commiting transaction");
+        log.info("Commiting transaction");
         try {
             Connection conn = sessionManager.getConnection(sessionInfo);
             conn.commit();
@@ -570,7 +593,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
     @Override
     public void rollbackTransaction(SessionInfo sessionInfo, StreamObserver<SessionInfo> responseObserver) {
-        System.out.println("Rollback transaction");
+        log.info("Rollback transaction");
         try {
             Connection conn = sessionManager.getConnection(sessionInfo);
             conn.rollback();
@@ -624,7 +647,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
         } else {
             //TODO check why reaches here and can't find the datasource sometimes, conn hash should never change for a single client
-            //System.out.println("Lookup connection hash -> " + sessionInfo.getConnHash());
+            //log.info("Lookup connection hash -> " + sessionInfo.getConnHash());
             conn = this.datasourceMap.get(sessionInfo.getConnHash()).getConnection();
             if (startSessionIfNone) {
                 SessionInfo updatedSession = this.sessionManager.createSession(sessionInfo.getClientUUID(), conn);
@@ -661,11 +684,13 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                 switch (colType) {
                     case Types.BLOB -> {
                         Blob blob = rs.getBlob(i + 1);
-                        currentValue = this.sessionManager.registerLob(session, blob);
+                        currentValue = UUID.randomUUID().toString();
+                        this.sessionManager.registerLob(session, blob, currentValue.toString());
                     }
                     case Types.CLOB -> {
                         Clob clob = rs.getClob(i + 1);
-                        currentValue = this.sessionManager.registerLob(session, clob);
+                        currentValue = UUID.randomUUID().toString();
+                        this.sessionManager.registerLob(session, clob, currentValue.toString());
                     }
                     case Types.BINARY -> {
                         int precision = rs.getMetaData().getPrecision(i + 1);
@@ -676,7 +701,8 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                             currentValue = rs.getBytes(i + 1);
                         } else {
                             InputStream inputStream = rs.getBinaryStream(i + 1);
-                            currentValue = this.sessionManager.registerLob(session, inputStream);
+                            currentValue = UUID.randomUUID().toString();
+                            this.sessionManager.registerLob(session, inputStream, currentValue.toString());
                         }
                     }
                     default -> {
@@ -721,6 +747,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     }
 
     private void addParam(SessionInfo session, int idx, PreparedStatement ps, Parameter param) throws SQLException {
+        log.info("Adding parameter idx {} type {}", idx, param.getType().toString());
         switch (param.getType()) {
             case INT -> ps.setInt(idx, (int) param.getValues().getFirst());
             case DOUBLE -> ps.setDouble(idx, (double) param.getValues().getFirst());
@@ -744,6 +771,10 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
             case BINARY_STREAM -> {
                 InputStream is = (InputStream) param.getValues().getFirst();
+                //TODO remove
+                if (is instanceof LobDataBlocksInputStream lis) {
+                    log.info("Adding lob {} parameter to prepared statement.", lis.getUuid());
+                }
                 if (param.getValues().size() > 1) {
                     Long size = (Long) param.getValues().get(1);
                     ps.setBinaryStream(idx, is, size);

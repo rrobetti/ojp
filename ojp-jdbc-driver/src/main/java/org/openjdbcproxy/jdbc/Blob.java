@@ -67,7 +67,7 @@ public class Blob extends Lob implements java.sql.Blob {
             os.close();
             return writtenCount;
         } catch (IOException e) {
-            throw new RuntimeException(e);//TODO review
+            throw new SQLException("Unable to write bytes: " + e.getMessage(), e);
         }
     }
 

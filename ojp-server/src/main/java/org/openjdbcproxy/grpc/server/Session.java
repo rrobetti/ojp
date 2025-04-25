@@ -2,8 +2,10 @@ package org.openjdbcproxy.grpc.server;
 
 import com.openjdbcproxy.grpc.SessionInfo;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
+import java.io.InputStream;
 import java.sql.Blob;
 import java.sql.Clob;
 import java.sql.Connection;
@@ -11,9 +13,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Holds information about a session of a given client.
@@ -32,6 +38,7 @@ public class Session {
     private Map<String, Statement> statementMap;
     private Map<String, PreparedStatement> preparedStatementMap;
     private Map<String, Object> lobMap;
+    private Map<String, Object> attrMap;
     private boolean closed;
 
     public Session(Connection connection, String connectionHash, String clientUUID) {
@@ -44,15 +51,26 @@ public class Session {
         this.statementMap = new ConcurrentHashMap<>();
         this.preparedStatementMap = new ConcurrentHashMap<>();
         this.lobMap = new ConcurrentHashMap<>();
+        this.attrMap = new ConcurrentHashMap<>();
     }
 
     public SessionInfo getSessionInfo() {
-        System.out.println("get session info -> " + this.connectionHash);
+        log.info("get session info -> " + this.connectionHash);
         return SessionInfo.newBuilder()
                 .setConnHash(this.connectionHash)
                 .setClientUUID(this.clientUUID)
                 .setSessionUUID(this.sessionUUID)
                 .build();
+    }
+
+    public void addAttr(String key, Object value) {
+        this.notClosed();
+        this.attrMap.put(key, value);
+    }
+
+    public Object getAttr(String key) {
+        this.notClosed();
+        return this.attrMap.get(key);
     }
 
     public void addResultSet(String uuid, ResultSet rs) {
@@ -150,5 +168,10 @@ public class Session {
         this.statementMap = null;
         this.preparedStatementMap = null;
         this.connection = null;
+        this.attrMap = null;
+    }
+
+    public Collection<Object> getAllLobs() {
+        return this.lobMap.values();
     }
 }

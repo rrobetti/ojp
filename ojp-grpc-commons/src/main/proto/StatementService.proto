@@ -90,8 +90,6 @@ message LobDataBlock {
     bytes data = 3;
     LobType lobType = 4;
     bytes metadata = 5; // Used for Binary stream where the prepared statement has to be created before the execution to set the stream directly to it.
-    //TODO send metadata from client to server with sql and param index where to put the new binary stream return the
-    // uuid of the new prepared statement to use in the subsequent blocks and in the call to executeQuery or executeUpdate
 }
 
 message SessionTerminationStatus {

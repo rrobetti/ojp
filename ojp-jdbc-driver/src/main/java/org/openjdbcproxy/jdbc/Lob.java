@@ -67,9 +67,9 @@ public class Lob {
                 try {
                     this.connection.setSession(this.lobReference.get().getSession());
                 } catch (InterruptedException e) {
-                    throw new RuntimeException(e);//TODO review
+                    throw new RuntimeException(e);
                 } catch (ExecutionException e) {
-                    throw new RuntimeException(e);//TODO review
+                    throw new RuntimeException(e);
                 }
                 return null;
             });
@@ -81,9 +81,6 @@ public class Lob {
         }
     }
 
-    //TODO see if I can use it like this, or should I implement it directly in the PreparedStatement?
-    //TODO I think I need to break the executeUpdate and executeQuery in server side in two phases prepare and execute
-    //but only call twice in this scenario where I need the PreparedStatement created to be able to set bytes
     protected LobReference sendBinaryStream(LobType lobType, InputStream inputStream, Map<Integer, Object> metadata) {
         try {
             try {
@@ -92,14 +89,8 @@ public class Lob {
                 throw new RuntimeException(e);
             }
             //Refresh Session object. Will wait until lobReference is set to progress.
-            try {
-                this.connection.setSession(this.lobReference.get().getSession());
-                return this.lobReference.get();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);//TODO review
-            } catch (ExecutionException e) {
-                throw new RuntimeException(e);//TODO review
-            }
+            this.connection.setSession(this.lobReference.get().getSession());
+            return this.lobReference.get();
         } catch (Exception e) {
             e.printStackTrace();//TODO treat exception
             throw new RuntimeException(e);
@@ -143,15 +134,18 @@ public class Lob {
                             } catch (SQLException ex) {
                                 throw new RuntimeException(ex);
                             }
-                        } catch (ExecutionException e) {
-                            throw new RuntimeException(e);//TODO review
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);//TODO review
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
                         }
                     }
 
                     if (currentPos >= length) {
                         return -1;//Finish stream if reached the length required
+                    }
+
+                    //TODO remove
+                    if (currentPos == 2048) {
+                        int i = 0;
                     }
 
                     return currentByte;

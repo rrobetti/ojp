@@ -1,7 +1,8 @@
 package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -9,29 +10,32 @@ import java.sql.Date;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 
-public class H2MultipleTypesIntegrationTest {
+import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 
-    @Test
-    public void typesCoverageTestSuccessful() throws SQLException, ClassNotFoundException, ParseException {
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
-        Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+public class MultipleTypesIntegrationTest {
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/databaseConnectionsMultipleTypesTests.csv")
+    public void typesCoverageTestSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, ParseException {
+        Class.forName(driverClass);
+        Connection conn = DriverManager.getConnection(url, user, pwd);
+
+        System.out.println("Testing for url -> " + url);
 
         try {
-            this.executeUpdate(conn,
+            executeUpdate(conn,
                     """
                             drop table test_table
                             """);
         } catch (Exception e) {
             //Might not find it, not an issue
         }
-        this.executeUpdate(conn,
+        executeUpdate(conn,
                 """
                 create table test_table(
                          val_int              INT NOT NULL,
@@ -124,12 +128,6 @@ public class H2MultipleTypesIntegrationTest {
         resultSet.close();
         psSelect.close();
         conn.close();
-    }
-
-    private int executeUpdate(Connection conn, String s) throws SQLException {
-        try (Statement stmt =  conn.createStatement()) {
-            return stmt.executeUpdate(s);
-        }
     }
 
 }

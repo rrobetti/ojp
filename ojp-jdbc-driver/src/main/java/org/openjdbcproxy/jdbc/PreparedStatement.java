@@ -3,10 +3,12 @@ package org.openjdbcproxy.jdbc;
 import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
+import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.Parameter;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -65,12 +67,14 @@ import static org.openjdbcproxy.grpc.dto.ParameterType.TIMESTAMP;
 import static org.openjdbcproxy.grpc.dto.ParameterType.UNICODE_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.URL;
 
+@Slf4j
 public class PreparedStatement implements java.sql.PreparedStatement {
     private final Connection connection;
     private String sql;
     private SortedMap<Integer, Parameter> paramsMap;
     private StatementService statementService;
     private String uuid;//If present represents the UUID of this PreparedStatement in the server
+
 
     public PreparedStatement(Connection connection, String sql, StatementService statementService) {
         this.connection = connection;
@@ -88,6 +92,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
+        log.info("Executing update for -> {}", this.sql);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
                 this.paramsMap.values().stream().toList(), this.uuid);
         this.connection.setSession(result.getSession());

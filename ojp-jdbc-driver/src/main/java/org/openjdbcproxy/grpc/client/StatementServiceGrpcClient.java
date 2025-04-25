@@ -90,6 +90,7 @@ public class StatementServiceGrpcClient implements StatementService {
     @Override
     public LobReference createLob(Connection connection, Iterator<LobDataBlock> lobDataBlock) throws SQLException {
         try {
+            log.info("Creating new lob");
             //Indicates that the server acquired a connection to the DB and wrote the first block successfully.
             SettableFuture<LobReference> sfFirstLobReference = SettableFuture.create();
             //Indicates that the server has finished writing the last block successfully.
@@ -142,8 +143,10 @@ public class StatementServiceGrpcClient implements StatementService {
 
                         @Override
                         public void onNext(LobReference lobReference) {
+                            log.info("Lob reference received");
                             if (this.abFirstResponseReceived.get()) {
                                 sfFirstLobReference.set(lobReference);
+                                log.info("First lob reference trigger");
                             }
                             this.lobReference = lobReference;
                             //Update connection session on first confirmation to get the session id if session is new.
@@ -169,7 +172,9 @@ public class StatementServiceGrpcClient implements StatementService {
 
                         @Override
                         public void onCompleted() {
+                            log.info("Final lob reference received");
                             sfFinalLobReference.set(this.lobReference);
+                            log.info("Final lob reference notified");
                         }
                     }
             );
@@ -180,13 +185,18 @@ public class StatementServiceGrpcClient implements StatementService {
                 lobDataBlockStream.onNext(lobDataBlock.next());
                 if (!firstBlockProcessedSuccessfully) {
                     //Wait first block to be processed by the server to avoid sending more data before the server actually acquired a connection and wrote the first block.
+                    log.info("Waiting first lob reference arrival");
                     sfFirstLobReference.get();
+                    log.info("First lob reference arrived");
                     firstBlockProcessedSuccessfully = true;
                 }
             }
             lobDataBlockStream.onCompleted();
 
-            return sfFinalLobReference.get();
+            log.info("Waiting for final lob ref");
+            LobReference finalLobRef = sfFinalLobReference.get();
+            log.info("Final lob ref received");
+            return finalLobRef;
         } catch (StatusRuntimeException e) {
             throw handle(e);
         } catch (Exception e) {

@@ -1,7 +1,8 @@
 package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -12,18 +13,21 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 
-public class H2BLOBIntegrationTest {
+import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 
-    @Test
-    public void createAndReadingBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
-        Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+public class BlobIntegrationTest {
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/databaseConnectionsBlobTests.csv")
+    public void createAndReadingBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
+        Class.forName(driverClass);
+        Connection conn = DriverManager.getConnection(url, user, pwd);
+
+        System.out.println("Testing for url -> " + url);
 
         try {
-            this.executeUpdate(conn,
+            executeUpdate(conn,
                     """
                             drop table test_table_blob
                             """);
@@ -31,7 +35,7 @@ public class H2BLOBIntegrationTest {
             //If fails disregard as per the table is most possibly not created yet
         }
 
-        this.executeUpdate(conn,
+        executeUpdate(conn,
                 """
                 create table test_table_blob(
                          val_blob  BLOB,
@@ -48,7 +52,7 @@ public class H2BLOBIntegrationTest {
 
         String testString = "TEST STRING BLOB";
         Blob blob = conn.createBlob(); //WHEN this happens a connection in the server is set to a session and I need to replicate that in the
-        //preparaed statement created previously
+        //prepared statement created previously
         blob.setBytes(1, testString.getBytes());
         psInsert.setBlob(1, blob);
         String testString2 = "BLOB VIA INPUT STREAM";
@@ -89,14 +93,16 @@ public class H2BLOBIntegrationTest {
         conn.close();
     }
 
-    @Test
-    public void creatinAndReadingLargeBLOBsSuccessful() throws SQLException, ClassNotFoundException, IOException {
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
-        Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+    @ParameterizedTest
+    @CsvFileSource(resources = "/databaseConnectionsBlobTests.csv")
+    public void creatingAndReadingLargeBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
+        Class.forName(driverClass);
+        Connection conn = DriverManager.getConnection(url, user, pwd);
+
+        System.out.println("Testing for url -> " + url);
 
         try {
-            this.executeUpdate(conn,
+            executeUpdate(conn,
                     """
                             drop table test_table_blob
                             """);
@@ -104,7 +110,7 @@ public class H2BLOBIntegrationTest {
             //If fails disregard as per the table is most possibly not created yet
         }
 
-        this.executeUpdate(conn,
+        executeUpdate(conn,
                 """
                 create table test_table_blob(
                          val_blob  BLOB
@@ -139,6 +145,7 @@ public class H2BLOBIntegrationTest {
                 System.out.println(count);
             }
             int blobByte = inputStreamBlob.read();
+            //TODO remove after debugging
             if (byteFile != blobByte) {
                 System.out.println(count);
             }
@@ -156,13 +163,6 @@ public class H2BLOBIntegrationTest {
         resultSet.close();
         psSelect.close();
         conn.close();
-    }
-
-
-    private int executeUpdate(Connection conn, String s) throws SQLException {
-        try (Statement stmt =  conn.createStatement()) {
-            return stmt.executeUpdate(s);
-        }
     }
 
 }

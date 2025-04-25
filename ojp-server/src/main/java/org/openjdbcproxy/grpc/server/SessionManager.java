@@ -9,6 +9,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Stream;
 
 /**
  * Manages sessions established with clients
@@ -23,7 +26,12 @@ public interface SessionManager {
     Statement getStatement(SessionInfo sessionInfo, String uuid);
     String registerPreparedStatement(SessionInfo sessionInfo, PreparedStatement ps);
     PreparedStatement getPreparedStatement(SessionInfo sessionInfo, String uuid);
-    String registerLob(SessionInfo sessionInfo, Object o);
+    void registerLob(SessionInfo sessionInfo, Object o, String lobUuid);
     <T> T getLob(SessionInfo sessionInfo, String uuid);
+    Collection<Object> getLobs(SessionInfo sessionInfo);
     void terminateSession(SessionInfo sessionInfo) throws SQLException;
+    void waitLobStreamsConsumption(SessionInfo sessionInfo);
+    void registerAttr(SessionInfo sessionInfo, String key, Object value);
+    Object getAttr(SessionInfo sessionInfo, String key);
+
 }

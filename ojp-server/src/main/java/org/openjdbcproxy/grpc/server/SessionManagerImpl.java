@@ -1,16 +1,17 @@
 package org.openjdbcproxy.grpc.server;
 
-import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.SessionInfo;
 import com.openjdbcproxy.grpc.TransactionStatus;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
-import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -29,9 +30,9 @@ public class SessionManagerImpl implements SessionManager{
 
     @Override
     public SessionInfo createSession(String clientUUID, Connection connection) {
-        System.out.println("Create session for client uuid " + clientUUID);
+        log.info("Create session for client uuid " + clientUUID);
         Session session = new Session(connection, connectionHashMap.get(clientUUID), clientUUID);
-        System.out.println("Session " + session.getSessionUUID() + " created for client uuid " + clientUUID);
+        log.info("Session " + session.getSessionUUID() + " created for client uuid " + clientUUID);
         this.sessionMap.put(session.getSessionUUID(), session);
         return session.getSessionInfo();
     }
@@ -79,10 +80,8 @@ public class SessionManagerImpl implements SessionManager{
     }
 
     @Override
-    public String registerLob(SessionInfo sessionInfo, Object blob) {
-        String uuid = UUID.randomUUID().toString();
-        this.sessionMap.get(sessionInfo.getSessionUUID()).addLob(uuid, blob);
-        return uuid;
+    public void registerLob(SessionInfo sessionInfo, Object lob, String lobUuid) {
+        this.sessionMap.get(sessionInfo.getSessionUUID()).addLob(lobUuid, lob);
     }
 
     @Override
@@ -91,14 +90,58 @@ public class SessionManagerImpl implements SessionManager{
     }
 
     @Override
+    public Collection<Object> getLobs(SessionInfo sessionInfo) {
+        return (Collection<Object>) this.sessionMap.get(sessionInfo.getSessionUUID()).getAllLobs();
+    }
+
+    @Override
     public void terminateSession(SessionInfo sessionInfo) throws SQLException {
-        System.out.println("Terminating session -> " + sessionInfo.getSessionUUID() );
+        log.info("Terminating session -> " + sessionInfo.getSessionUUID() );
         Session targetSession = this.sessionMap.remove(sessionInfo.getSessionUUID());
 
         if (TransactionStatus.TRX_ACTIVE.equals(sessionInfo.getTransactionInfo().getTransactionStatus())) {
-            System.out.println("Rolling back active transaction");
-            targetSession.getConnection().rollback();
+            if (!targetSession.getConnection().getAutoCommit()) {
+                log.info("Rolling back active transaction");
+                targetSession.getConnection().rollback();
+            }
         }
         targetSession.terminate();
+    }
+
+    @SneakyThrows
+    @Override
+    public void waitLobStreamsConsumption(SessionInfo sessionInfo) {
+        log.info("Check if there are any binary stream lobs in session");
+        Session session = this.sessionMap.get(sessionInfo.getSessionUUID());
+        List<LobDataBlocksInputStream> binaryStreamsLobs = session.getAllLobs().stream()
+                .filter((o) -> o instanceof LobDataBlocksInputStream)
+                .map(LobDataBlocksInputStream.class::cast).toList();
+        log.info("{} binary stream lobs found ", binaryStreamsLobs.size());
+        for (LobDataBlocksInputStream lob : binaryStreamsLobs) {
+            log.info("Verifying that lob {} is fully consumed.", lob.getUuid());
+            while (!lob.getFullyConsumed().get()) {
+                Thread.sleep(10);
+            }
+            log.info("Lob {} fully consumed.", lob.getUuid());
+            //During postgres tests it was found out that if the update is executed immediately after the lob injection
+            //the lob is not yet set in the prepared statement, this thread sleep currently is required as per there is
+            // no way to be sure that the prepared statement is ready, as this only affects Binary streams (not blobs or
+            // clobs), the MVP will use this solution.
+            // TODO attempt reengineering.
+            Thread.sleep(100);
+            log.info("Binary stream lob finished");
+        }
+    }
+
+    @Override
+    public void registerAttr(SessionInfo sessionInfo, String key, Object value) {
+        Session session = this.sessionMap.get(sessionInfo.getSessionUUID());
+        session.addAttr(key, value);
+    }
+
+    @Override
+    public Object getAttr(SessionInfo sessionInfo, String key) {
+        Session session = this.sessionMap.get(sessionInfo.getSessionUUID());
+        return session.getAttr(key);
     }
 }

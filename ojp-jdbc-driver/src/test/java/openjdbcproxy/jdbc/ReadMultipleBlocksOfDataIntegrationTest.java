@@ -2,32 +2,34 @@ package openjdbcproxy.jdbc;
 
 import org.junit.Assert;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvFileSource;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
+
+import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 
 public class ReadMultipleBlocksOfDataIntegrationTest {
 
     @ParameterizedTest
-    @ValueSource(ints = {1,99,100,101,1000,10000})
-    public void multiplePagesOfRowsResultSetSuccessful(int totalRecords) throws SQLException, ClassNotFoundException {
-        Class.forName("org.postgresql.Driver");
-        Connection conn = DriverManager.
-                getConnection("jdbc:postgresql:", "", "");
+    @CsvFileSource(resources = "/databaseConnectionsReadMultipleBlocksTests.csv")
+    public void multiplePagesOfRowsResultSetSuccessful(int totalRecords, String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException {
+        Class.forName(driverClass);
+        Connection conn = DriverManager.getConnection(url, user, pwd);
+
+        System.out.println("Testing retrieving " + totalRecords + " records from url -> " + url);
 
         try {
-            this.executeUpdate(conn,
+            executeUpdate(conn,
                     """
                             drop table test_table_multi
                             """);
         } catch (Exception e) {
             //Does not matter
         }
-        this.executeUpdate(conn,
+        executeUpdate(conn,
                 """
                 create table test_table_multi(
                          id INT NOT NULL,
@@ -35,7 +37,7 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
                 """);
 
         for (int i = 0; i < totalRecords; i++) { //TODO make this test parameterized with multiple parameters
-            this.executeUpdate(conn,
+            executeUpdate(conn,
                     "insert into test_table_multi (id, title) values (" + i + ", 'TITLE_" + i + "')"
             );
         }
@@ -62,11 +64,4 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
 
         conn.close();
     }
-
-    private int executeUpdate(Connection conn, String s) throws SQLException {
-        try (Statement stmt =  conn.createStatement()) {
-            return stmt.executeUpdate(s);
-        }
-    }
-
 }
