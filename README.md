@@ -2,8 +2,6 @@
 
 A JDBC driver and proxy server to decouple applications from relational database connection management.
 
-## Status: POC in development...
-
 ## Questions we aim to answer:
 #### How to autoscale our applications without overloading our relational database(s) with new connections?
 #### How to replace native JDBC drivers seamlessly?
