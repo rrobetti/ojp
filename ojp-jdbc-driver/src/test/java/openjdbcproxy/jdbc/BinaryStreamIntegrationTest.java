@@ -18,7 +18,7 @@ import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 public class BinaryStreamIntegrationTest {
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsBinaryStreamTests.csv")
+    @CsvFileSource(resources = "/postgres_connection.csv")
     public void createAndReadingBinaryStreamSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
@@ -88,7 +88,7 @@ public class BinaryStreamIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsBinaryStreamTests.csv")
+    @CsvFileSource(resources = "/postgres_connection.csv")
     public void createAndReadingLargeBinaryStreamSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);

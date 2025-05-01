@@ -19,7 +19,7 @@ import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 public class BlobIntegrationTest {
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsBlobTests.csv")
+    @CsvFileSource(resources = "/h2_connection.csv")
     public void createAndReadingBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
@@ -94,7 +94,7 @@ public class BlobIntegrationTest {
     }
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsBlobTests.csv")
+    @CsvFileSource(resources = "/h2_connection.csv")
     public void creatingAndReadingLargeBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);

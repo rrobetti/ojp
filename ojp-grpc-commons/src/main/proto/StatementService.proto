@@ -97,18 +97,26 @@ message SessionTerminationStatus {
 }
 
 enum ResourceType {
-    RESULT_SET = 0;
-    STATEMENT = 1;
-    PREPARED_STATEMENT = 2;
-    BLOB = 3;
+    RES_RESULT_SET = 0;
+    RES_STATEMENT = 1;
+    RES_PREPARED_STATEMENT = 2;
+    RES_LOB = 3;
 }
 
-message CloseResourceRequest {
-    ResultType type = 1;
+enum CallType {
+    CALL_SET = 0;
+    CALL_GET = 1;
 }
 
-message CloseResourceResponse {
-    bool closed = 1;
+message CallResourceRequest {
+    ResourceType resourceType = 1;
+    CallType callType = 2;
+    string resourceName = 3;
+    bytes params = 4;
+}
+
+message CallResourceResponse {
+    bytes values = 1;
 }
 
 service StatementService {
@@ -123,8 +131,11 @@ service StatementService {
     // call that free method? Because JPA with Hikari CP will not call close on the connection
     // --> I can relate the Blob to the resource it is being used on, if that or those resources all close I can close
     // the Blob and remove it from the session.
-    rpc closeResource(CloseResourceRequest) returns (CloseResourceResponse);
+    /**
+    Resources can be closed with the exception of connection as per connections are managed by the connection pool.
+    **/
     rpc startTransaction(SessionInfo) returns (SessionInfo);
     rpc commitTransaction(SessionInfo) returns (SessionInfo);
     rpc rollbackTransaction(SessionInfo) returns (SessionInfo);
+    rpc callResource(CallResourceRequest) returns (CallResourceResponse);
 }

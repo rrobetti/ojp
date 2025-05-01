@@ -14,7 +14,7 @@ import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 public class ReadMultipleBlocksOfDataIntegrationTest {
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsReadMultipleBlocksTests.csv")
+    @CsvFileSource(resources = "/h2_postgres_connections_with_record_counts.csv")
     public void multiplePagesOfRowsResultSetSuccessful(int totalRecords, String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);

@@ -121,47 +121,15 @@ public class Session {
 
     public void terminate() throws SQLException {
 
-        //Free all blobs
-        for (Object o : this.lobMap.values()) {
-            try {
-                if (o instanceof Blob b) {
-                    b.free();
-                } else if (o instanceof Clob c) {
-                    c.free();
-                }
-            } catch (Exception e) {
-                log.error("Failed to free Blob: " + e.getMessage(), e);
-            }
-        }
-        //Close all ResultSets
-        for (ResultSet rs : this.resultSetMap.values()) {
-            try {
-                rs.close();
-            } catch (Exception e) {
-                log.error("Failed to close ResultSet: " + e.getMessage(), e);
-            }
-        }
-        //Close all Statements
-        for (Statement stmt : this.statementMap.values()) {
-            try {
-                stmt.close();
-            } catch (Exception e) {
-                log.error("Failed to close Statement: " + e.getMessage(), e);
-            }
-        }
-        //Close all PreparedStatements
-        for (PreparedStatement ps : this.preparedStatementMap.values()) {
-            try {
-                ps.close();
-            } catch (Exception e) {
-                log.error("Failed to close PreparedStatement: " + e.getMessage(), e);
-            }
+        if (this.closed) {
+            return;
         }
 
-        //If an exception happens closing the actual connection, propagate it to the client.
+        //Closing the connection here means that the connection pool will close all resources associated with it and
+        // reset the connection state before returning it to the pool.
         this.connection.close();
 
-        //Clear internal objects
+        //Clear session internal objects to free memory
         this.closed = true;
         this.lobMap = null;
         this.resultSetMap = null;

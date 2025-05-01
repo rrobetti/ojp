@@ -16,7 +16,7 @@ import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 public class BasicCrudIntegrationTest {
 
     @ParameterizedTest
-    @CsvFileSource(resources = "/databaseConnectionsCrudTests.csv")
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
     public void crudTestSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException {
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
