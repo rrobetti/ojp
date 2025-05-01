@@ -5,8 +5,8 @@ package org.openjdbcproxy.jdbc;
  * calls before returning a connection to the pool, in other words connection pools don't close connections, they
  * close the attached resources like result sets and statements, rollback current transaction, set autocommit back to true,
  * set read only back to false and clear warnings. This class monitors which of these methods have been called and if it
- * is identified that the connection has been homogenized, a session termination trigger flag is set.
- * Note that rollback is not part of the trigger because it is a commonly called method and already managed specifically,
+ * is identified that the connection has been reset/hygienized, a session termination trigger flag is issued.
+ * Note that rollback is not part of the trigger because it is a commonly called method and already managed separately,
  * meaning that if rollback was called we already sent a message to the server and the transaction is rollback already.
  */
 public class SessionTerminationTrigger {
