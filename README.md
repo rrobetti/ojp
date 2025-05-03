@@ -8,6 +8,9 @@ A JDBC driver and proxy server to decouple applications from relational database
 #### How to support multiple relational databases at once?
 
 ## High Level Design
+
+### [Architectural decision records (ADRs)](documents/ADRs)
+
 <img src="documents/designs/ojp_high_level_design.png" alt="OJP High Level Design" />
 
 * The OJB JDBC driver is used as a replacement for the native JDBC driver(s) previously used with minimum change, the only change required being prefixing the connection URL with ojp_. For example: 
