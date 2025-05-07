@@ -22,7 +22,7 @@ instead of:
 postgresql://user@localhost
 ```
 * **Open Source**: OJP is an open-source project that is free to use, modify, and distribute.
-* The OPT Proxy server is deployed as an independent service sitting and will serve as a smart proxy between the application(s) and their respective relational database(s) controlling the number of connections open against each database.
+* The OJP server is deployed as an independent service sitting and will serve as a smart proxy between the application(s) and their respective relational database(s) controlling the number of connections open against each database.
 * **Smart Connection Management***: The proxy ensures that database connections are allocated only when needed, improving scalability and resource utilization. In example below, only when executeQuery is called a real connection is enlisted to execute the operation, reducing the time that connection is hold and allowing for it to be used by other clients meanwhile:
 ```
         Class.forName("org.openjdbcproxy.jdbc.Driver");
@@ -78,10 +78,10 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 - ✅ BLOB support.
 - ✅ Transactions support.
 - ✅ Binary Stream support.
-- 🕓 ResultSet metadata enquiring.
+- ✅ ResultSet metadata enquiring.
 - ❌ CLOB support.
 - ❌ Statement and Prepared statement advanced features.
-- ❌ Connection advanced features.
+- 🕓 Connection advanced features.
 - ❌ BLOB and CLOB advanced features.
 - ❌ Configurable data sources by user and/or database. 
 - ❌ RAFT consensus POC.

@@ -1,6 +1,8 @@
 package org.openjdbcproxy.grpc.server;
 
 import com.google.protobuf.ByteString;
+import com.openjdbcproxy.grpc.CallResourceRequest;
+import com.openjdbcproxy.grpc.CallResourceResponse;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
@@ -12,6 +14,7 @@ import com.openjdbcproxy.grpc.SessionInfo;
 import com.openjdbcproxy.grpc.SessionTerminationStatus;
 import com.openjdbcproxy.grpc.StatementRequest;
 import com.openjdbcproxy.grpc.StatementServiceGrpc;
+import com.openjdbcproxy.grpc.TargetCall;
 import com.openjdbcproxy.grpc.TransactionInfo;
 import com.openjdbcproxy.grpc.TransactionStatus;
 import com.zaxxer.hikari.HikariConfig;
@@ -32,6 +35,7 @@ import org.openjdbcproxy.grpc.dto.ParameterType;
 
 import java.io.InputStream;
 import java.io.Writer;
+import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -614,6 +618,77 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             sendSQLExceptionMetadata(new SQLException("Unable to rollback transaction: " + e.getMessage()), responseObserver);
         }
     }
+
+    @Override
+    public void callResource(CallResourceRequest request, StreamObserver<CallResourceResponse> responseObserver) {
+        try {
+            if (!request.hasSession()) {
+                throw new SQLException("No active session.");//TODO review might have to create a session in some cases
+            }
+
+            Object resource = switch (request.getResourceType()) {
+                case RES_RESULT_SET ->
+                        sessionManager.getResultSet(request.getSession(), request.getResourceUUID());
+                case RES_LOB -> sessionManager.getLob(request.getSession(), request.getResourceUUID());
+                case RES_STATEMENT ->
+                        sessionManager.getStatement(request.getSession(), request.getResourceUUID());
+                case RES_PREPARED_STATEMENT ->
+                        sessionManager.getPreparedStatement(request.getSession(), request.getResourceUUID());
+                case RES_CONNECTION -> sessionManager.getConnection(request.getSession());
+                default -> throw new RuntimeException("Resource type invalid");
+            };
+
+            Class<?> clazz = resource.getClass();
+            Method method = clazz.getDeclaredMethod(methodName(request.getTarget()));
+            Object resultFirstLevel = method.invoke(resource);
+            CallResourceResponse.Builder responseBuilder = CallResourceResponse.newBuilder();
+            if (request.getTarget().hasNextCall()) {
+                //Second level calls, for cases like getMetadata().isAutoIncrement(int column)
+                Class<?> clazzNext = resultFirstLevel.getClass();
+                Method methodNext = this.findMethodByName(clazzNext, methodName(request.getTarget().getNextCall()));
+                java.lang.reflect.Parameter[] params = methodNext.getParameters();
+                List<Object> paramsReceived = null;
+                Object resultSecondLevel = null;
+                if (params != null && params.length > 0) {
+                    paramsReceived = deserialize(request.getTarget().getNextCall().getParams().toByteArray(), List.class);
+                    resultSecondLevel = methodNext.invoke(resultFirstLevel, paramsReceived.toArray());
+                } else {
+                    resultSecondLevel = methodNext.invoke(resultFirstLevel);
+                }
+                responseBuilder.setValues(ByteString.copyFrom(serialize(resultSecondLevel)));
+            } else {
+                responseBuilder.setValues(ByteString.copyFrom(serialize(resultFirstLevel)));
+            }
+
+            responseObserver.onNext(responseBuilder.build());
+            responseObserver.onCompleted();
+        } catch (SQLException se) {
+            sendSQLExceptionMetadata(se, responseObserver);
+        } catch (Exception e) {
+            sendSQLExceptionMetadata(new SQLException("Unable to call resource: " + e.getMessage()), responseObserver);
+        }
+    }
+
+    private Method findMethodByName(Class<?> clazz, String methodName) {
+        Method[] methods = clazz.getMethods();
+        for (Method method : methods) {
+            if (methodName.equalsIgnoreCase(method.getName())) {
+                return method;
+            }
+        }
+        throw new RuntimeException("Method " + methodName + " not found in class " + clazz.getName());
+    }
+
+    private String methodName(TargetCall target) throws SQLException {
+        String prefix = switch (target.getCallType()) {
+            case CALL_IS -> "is";
+            case CALL_GET -> "get";
+            case CALL_SET -> "set";
+            case UNRECOGNIZED -> throw new SQLException("CALL type not supported.");
+        };
+        return prefix + target.getResourceName();
+    }
+
 
     private SessionInfo.Builder newBuilderFrom(SessionInfo activeSessionInfo) {
         return SessionInfo.newBuilder()

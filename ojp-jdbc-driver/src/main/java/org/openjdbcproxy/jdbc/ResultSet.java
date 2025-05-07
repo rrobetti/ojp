@@ -5,13 +5,12 @@ import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.SessionInfo;
 import io.grpc.StatusRuntimeException;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.client.StatementService;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 
-import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import java.math.BigDecimal;
@@ -22,7 +21,6 @@ import java.sql.Clob;
 import java.sql.Date;
 import java.sql.NClob;
 import java.sql.Ref;
-import java.sql.ResultSetMetaData;
 import java.sql.RowId;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
@@ -42,6 +40,7 @@ import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 @Slf4j
 public class ResultSet implements java.sql.ResultSet {
 
+    @Getter
     private final Map<String, Integer> labelsMap;
     private final StatementService statementService;
 
@@ -52,6 +51,7 @@ public class ResultSet implements java.sql.ResultSet {
     private java.sql.Statement statement;
     private String resultSetUUID;
     private SessionInfo session;
+    private java.sql.ResultSetMetaData resultSetMetadata;
 
     public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService, java.sql.Statement statement) throws SQLException {
         this.itResults = itOpResult;
@@ -295,8 +295,14 @@ public class ResultSet implements java.sql.ResultSet {
     }
 
     @Override
-    public ResultSetMetaData getMetaData() throws SQLException {
-        return null; //TODO to be implemented in a single call to server which will use reflection to apply
+    public java.sql.ResultSetMetaData getMetaData() throws SQLException {
+        if (this.resultSetUUID == null) {
+            throw new SQLException("No result set reference found.");
+        }
+        if (this.resultSetMetadata == null) {
+            this.resultSetMetadata = new ResultSetMetaData(this.session, this.resultSetUUID, this, this.statementService);
+        }
+        return this.resultSetMetadata;
     }
 
     @Override

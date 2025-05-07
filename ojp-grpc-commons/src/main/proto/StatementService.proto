@@ -101,18 +101,27 @@ enum ResourceType {
     RES_STATEMENT = 1;
     RES_PREPARED_STATEMENT = 2;
     RES_LOB = 3;
+    RES_CONNECTION = 4;
 }
 
 enum CallType {
     CALL_SET = 0;
     CALL_GET = 1;
+    CALL_IS = 2;
+}
+
+message TargetCall {
+    CallType callType = 1;
+    string resourceName = 2;
+    bytes params = 3;
+    TargetCall nextCall = 4;
 }
 
 message CallResourceRequest {
-    ResourceType resourceType = 1;
-    CallType callType = 2;
-    string resourceName = 3;
-    bytes params = 4;
+    SessionInfo session = 1;
+    ResourceType resourceType = 2;
+    string resourceUUID = 3;
+    TargetCall target = 4;
 }
 
 message CallResourceResponse {

@@ -1,5 +1,7 @@
 package org.openjdbcproxy.grpc.client;
 
+import com.openjdbcproxy.grpc.CallResourceRequest;
+import com.openjdbcproxy.grpc.CallResourceResponse;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
@@ -34,4 +36,5 @@ public interface StatementService {
     SessionInfo startTransaction(SessionInfo session) throws SQLException;
     SessionInfo commitTransaction(SessionInfo session) throws SQLException;
     SessionInfo rollbackTransaction(SessionInfo session) throws SQLException;
+    CallResourceResponse callResource(CallResourceRequest request) throws SQLException;
 }

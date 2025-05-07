@@ -1,7 +1,6 @@
 package org.openjdbcproxy.jdbc;
 
 import com.openjdbcproxy.grpc.OpResult;
-import com.openjdbcproxy.grpc.SessionInfo;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.sql.SQLException;
@@ -15,6 +14,8 @@ public class Statement implements java.sql.Statement {
 
     private final Connection connection;
     private final StatementService statementService;
+    private ResultSet lastResultSet;
+    private int lastUpdateCount;
 
     public Statement(Connection connection, StatementService statementService) {
         this.connection = connection;
@@ -96,17 +97,28 @@ public class Statement implements java.sql.Statement {
 
     @Override
     public boolean execute(String sql) throws SQLException {
-        return false;
+        String trimmedSql = sql.trim().toUpperCase();
+        if (trimmedSql.startsWith("SELECT")) {
+            // Delegate to executeQuery
+            ResultSet resultSet = this.executeQuery(sql);
+            // Store the ResultSet for later retrieval if needed
+            this.lastResultSet = resultSet;
+            return true; // Indicates a ResultSet was returned
+        } else {
+            // Delegate to executeUpdate
+            this.lastUpdateCount = this.executeUpdate(sql);
+            return false; // Indicates no ResultSet was returned
+        }
     }
 
     @Override
     public ResultSet getResultSet() throws SQLException {
-        return null;
+        return this.lastResultSet;
     }
 
     @Override
     public int getUpdateCount() throws SQLException {
-        return 0;
+        return this.lastUpdateCount;
     }
 
     @Override
