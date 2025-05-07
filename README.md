@@ -2,6 +2,8 @@
 
 A JDBC driver and proxy server to decouple applications from relational database connection management.
 
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/wqoejbve8z)
+
 ## Questions we aim to answer:
 #### How to autoscale our applications without overloading our relational database(s) with new connections?
 #### How to replace native JDBC drivers seamlessly?
@@ -12,6 +14,7 @@ A JDBC driver and proxy server to decouple applications from relational database
 ### [Architectural decision records (ADRs)](documents/ADRs)
 
 <img src="documents/designs/ojp_high_level_design.png" alt="OJP High Level Design" />
+
 
 * The OJB JDBC driver is used as a replacement for the native JDBC driver(s) previously used with minimum change, the only change required being prefixing the connection URL with ojp_. For example: 
 ```
