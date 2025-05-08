@@ -69,6 +69,8 @@ The ojp-jdbc-driver is an implementation of the JDBC specification. It connects 
 
 >Run any integration tests, the ojp-server is expected to be running in the same machine.
 
+Connections configuration: There are csv files under test/resources with connection details defaulted to H2 database, the name of each file implies which database connections can be added to it, for example the file h2_postgres_connections.csv can contain connections to H2 and/or postgres databases, integration tests classes that relly on this file will run all their tests against each connection in the file. 
+
 ### ojp-grpc-commons
 The ojp-grpc-commons module contains the shared gRPC contracts used between the ojp-server and ojp-jdbc-driver. These contracts define the communication protocol and structure for requests and responses exchanged between the server and the driver.
 #### How to build
@@ -83,13 +85,19 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 - ✅ Binary Stream support.
 - ✅ ResultSet metadata enquiring.
 - ❌ CLOB support.
-- ❌ Statement and Prepared statement advanced features.
+- 🕓 Statement and Prepared statement advanced features.
 - 🕓 Connection advanced features.
+- ❌ OpenTelemetry implementation.
+- ❌ Docker image implementation.
+- ❌ Support for Spring Boot/Spring Data.
+- ❌ Support for Micronaut.
+- ❌ Support for Quarkus.
+- ❌ Support for Helidon.
 - ❌ BLOB and CLOB advanced features.
 - ❌ Configurable data sources by user and/or database. 
 - ❌ RAFT consensus POC.
 - ❌ RAFT and connection smart balancing and resizing.
-
+- ❌ Docker compose for (RAFT) cluster.
 
 ✅ - Done
 ❌ - Not started
