@@ -19,4 +19,6 @@ public class CommonConstants {
     public static final String STATEMENT_AUTO_GENERATED_KEYS_KEY = "STATEMENT_AUTO_GENERATED_KEYS_KEY";
     public static final String STATEMENT_COLUMN_INDEXES_KEY = "STATEMENT_COLUMN_INDEXES_KEY";
     public static final String STATEMENT_COLUMN_NAMES_KEY = "STATEMENT_COLUMN_NAMES_KEY";
+    public static final int DEFAULT_PORT_NUMBER = 1059;
+    public static final String OJP_REGEX_PATTERN = "ojp\\[([^\\]]+)\\]";
 }

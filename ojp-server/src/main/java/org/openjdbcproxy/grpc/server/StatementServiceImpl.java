@@ -70,7 +70,6 @@ import static org.openjdbcproxy.grpc.server.Constants.EMPTY_LIST;
 import static org.openjdbcproxy.grpc.server.Constants.EMPTY_MAP;
 import static org.openjdbcproxy.grpc.server.Constants.EMPTY_STRING;
 import static org.openjdbcproxy.grpc.server.Constants.H2_DRIVER_CLASS;
-import static org.openjdbcproxy.grpc.server.Constants.OJP_DRIVER_PREFIX;
 import static org.openjdbcproxy.grpc.server.Constants.POSTGRES_DRIVER_CLASS;
 import static org.openjdbcproxy.grpc.server.Constants.SHA_256;
 import static org.openjdbcproxy.grpc.server.GrpcExceptionHandler.sendSQLExceptionMetadata;
@@ -1109,7 +1108,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         if (url == null) {
             return url;
         }
-        return url.replaceAll(OJP_DRIVER_PREFIX, EMPTY_STRING);
+        return url.replaceAll(CommonConstants.OJP_REGEX_PATTERN + "_", EMPTY_STRING);
     }
 
     private String hashConnectionDetails(ConnectionDetails connectionDetails) {

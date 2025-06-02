@@ -19,6 +19,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
+import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.dto.Parameter;
 import org.openjdbcproxy.jdbc.Connection;
 import org.openjdbcproxy.jdbc.LobGrpcIterator;
@@ -28,6 +29,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
@@ -38,25 +41,46 @@ import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 @Slf4j
 public class StatementServiceGrpcClient implements StatementService {
 
-    private final StatementServiceGrpc.StatementServiceBlockingStub statemetServiceBlockingStub;
-    private final StatementServiceGrpc.StatementServiceStub statemetServiceStub;
+    private static final String DEFAULT_HOST = "localhost";
+    private final Pattern pattern = Pattern.compile(CommonConstants.OJP_REGEX_PATTERN);
 
-    public StatementServiceGrpcClient() {
-        //Once channel is open it remains open and is shared among all requests.
-        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 8080)
-                .usePlaintext()
-                .build();
+    private StatementServiceGrpc.StatementServiceBlockingStub statemetServiceBlockingStub;
+    private StatementServiceGrpc.StatementServiceStub statemetServiceStub;
 
-        this.statemetServiceBlockingStub = StatementServiceGrpc.newBlockingStub(channel);
-        this.statemetServiceStub = StatementServiceGrpc.newStub(channel);
-    }
+    public StatementServiceGrpcClient() {}
 
     @Override
     public SessionInfo connect(ConnectionDetails connectionDetails) throws SQLException {
+        this.grpcChannelOpenAndStubsInitialized(connectionDetails.getUrl());
         try {
             return this.statemetServiceBlockingStub.connect(connectionDetails);
         } catch (StatusRuntimeException e) {
             throw handle(e);
+        }
+    }
+
+    private void grpcChannelOpenAndStubsInitialized(String url) {
+        if (this.statemetServiceStub == null && this.statemetServiceBlockingStub == null) {
+            Matcher matcher = pattern.matcher(url);
+            String host = DEFAULT_HOST;
+            int port = CommonConstants.DEFAULT_PORT_NUMBER;
+
+            if (matcher.find()) {
+                String hostPort = matcher.group(1);
+                String[] hostPortSplit = hostPort.split(":");
+                host = hostPortSplit[0];
+                port = Integer.parseInt(hostPortSplit[1]);
+            } else {
+                throw new RuntimeException("Invalid OJP host or port.");
+            }
+
+            //Once channel is open it remains open and is shared among all requests.
+            ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+                    .usePlaintext()
+                    .build();
+
+            this.statemetServiceBlockingStub = StatementServiceGrpc.newBlockingStub(channel);
+            this.statemetServiceStub = StatementServiceGrpc.newStub(channel);
         }
     }
 

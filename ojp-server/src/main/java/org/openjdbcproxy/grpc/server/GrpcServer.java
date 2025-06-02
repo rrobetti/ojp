@@ -2,13 +2,15 @@ package org.openjdbcproxy.grpc.server;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import org.openjdbcproxy.constants.CommonConstants;
 
 import java.io.IOException;
 
 public class GrpcServer {
+
     public static void main(String[] args) throws IOException, InterruptedException {
         Server server = ServerBuilder
-                .forPort(8080)
+                .forPort(CommonConstants.DEFAULT_PORT_NUMBER)
                 .addService(new StatementServiceImpl(new SessionManagerImpl())).build();
 
         server.start();

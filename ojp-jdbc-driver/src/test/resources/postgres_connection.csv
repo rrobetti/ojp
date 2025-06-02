@@ -1,1 +1,1 @@
-org.openjdbcproxy.jdbc.Driver,jdbc:ojp_postgresql://,,
+org.openjdbcproxy.jdbc.Driver,jdbc:ojp[localhost:1059]_postgresql://:25060/defaultdb?sslmode=require,,
