@@ -3,6 +3,7 @@ package org.openjdbcproxy.grpc.server;
 import com.google.protobuf.ByteString;
 import com.openjdbcproxy.grpc.CallResourceRequest;
 import com.openjdbcproxy.grpc.CallResourceResponse;
+import com.openjdbcproxy.grpc.CallType;
 import com.openjdbcproxy.grpc.ConnectionDetails;
 import com.openjdbcproxy.grpc.LobDataBlock;
 import com.openjdbcproxy.grpc.LobReference;
@@ -31,7 +32,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.openjdbcproxy.constants.CommonConstants;
 import org.openjdbcproxy.grpc.dto.OpQueryResult;
 import org.openjdbcproxy.grpc.dto.Parameter;
-import org.openjdbcproxy.grpc.dto.ParameterType;
 
 import java.io.InputStream;
 import java.io.Writer;
@@ -40,12 +40,14 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Blob;
+import java.sql.CallableStatement;
 import java.sql.Clob;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Savepoint;
 import java.sql.Statement;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -64,6 +66,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.openjdbcproxy.constants.CommonConstants.MAX_LOB_DATA_BLOCK_SIZE;
 import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
+import static org.openjdbcproxy.grpc.server.Constants.EMPTY_LIST;
+import static org.openjdbcproxy.grpc.server.Constants.EMPTY_MAP;
 import static org.openjdbcproxy.grpc.server.Constants.EMPTY_STRING;
 import static org.openjdbcproxy.grpc.server.Constants.H2_DRIVER_CLASS;
 import static org.openjdbcproxy.grpc.server.Constants.OJP_DRIVER_PREFIX;
@@ -73,6 +77,7 @@ import static org.openjdbcproxy.grpc.server.GrpcExceptionHandler.sendSQLExceptio
 
 @Slf4j
 @RequiredArgsConstructor
+//TODO this became a GOD class, need to try to delegate some work to specialized other classes where possible, it is challenging because many GRPC callbacks rely on attributes present here to work.
 public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceImplBase {
 
     //TODO put the datasource at database level not user + database so if more than one user agaist the DB still maintain the max pool size
@@ -134,10 +139,11 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             dto = sessionConnection(request.getSession(), false);
 
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
-            if (CollectionUtils.isNotEmpty(params) || StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
-                PreparedStatement ps;
-                if (StringUtils.isNotEmpty(request.getPreparedStatementUUID())) {
-                    ps = sessionManager.getPreparedStatement(dto.getSession(), request.getPreparedStatementUUID());
+            PreparedStatement ps = dto.getSession() != null && StringUtils.isNotBlank(dto.getSession().getSessionUUID())
+                    && StringUtils.isNoneBlank(request.getStatementUUID()) ?
+                    sessionManager.getPreparedStatement(dto.getSession(), request.getStatementUUID()) : null;
+            if (CollectionUtils.isNotEmpty(params) || ps != null) {
+                if (StringUtils.isNotEmpty(request.getStatementUUID())) {
                     Collection<Object> lobs = sessionManager.getLobs(dto.getSession());
                     for (Object o : lobs) {
                         LobDataBlocksInputStream lobIS = (LobDataBlocksInputStream) o;
@@ -147,12 +153,12 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                     }
                     sessionManager.waitLobStreamsConsumption(dto.getSession());
                 } else {
-                    ps = this.createPreparedStatement(dto, request.getSql(), params);
+                    ps = this.createPreparedStatement(dto, request.getSql(), params, request);
                 }
                 updated = ps.executeUpdate();
                 stmt = ps;
             } else {
-                stmt = dto.getConnection().createStatement();
+                stmt = this.createStatement(dto.getConnection(), request);
                 updated = stmt.executeUpdate(request.getSql());
             }
 
@@ -178,10 +184,72 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         }
     }
 
-    private PreparedStatement createPreparedStatement(ConnectionSessionDTO dto, String sql, List<Parameter> params)
+    private Statement createStatement(Connection connection, StatementRequest request) throws SQLException {
+        if (StringUtils.isNotEmpty(request.getStatementUUID())) {
+            return this.sessionManager.getStatement(request.getSession(), request.getStatementUUID());
+        }
+        if (request.getProperties().isEmpty()) {
+            return connection.createStatement();
+        }
+        Map<String, Object> properties = deserialize(request.getParameters().toByteArray(), Map.class);
+
+        if (properties.isEmpty()) {
+            return connection.createStatement();
+        }
+        if (properties.size() == 2) {
+            return connection.createStatement(
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
+        }
+        if (properties.size() == 3) {
+            return connection.createStatement(
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
+        }
+        throw new SQLException("Incorrect number of properties for creating a new statement.");
+    }
+
+    private PreparedStatement createPreparedStatement(ConnectionSessionDTO dto, String sql, List<Parameter> params,
+                                                      StatementRequest request)
             throws SQLException {
         log.info("Creating prepared statement for {}", sql);
-        PreparedStatement ps = dto.getConnection().prepareStatement(sql);
+
+        PreparedStatement ps = null;
+        if (request.getProperties().isEmpty()) {
+            ps = dto.getConnection().prepareStatement(sql);
+        }
+        Map<String, Object> properties = EMPTY_MAP;
+        if (!request.getProperties().isEmpty()) {
+            properties = deserialize(request.getProperties().toByteArray(), Map.class);
+        }
+        if (properties.isEmpty()) {
+            ps = dto.getConnection().prepareStatement(sql);
+        }
+        if (properties.size() == 1) {
+            int[] columnIndexes = (int[]) properties.get(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY);
+            String[] columnNames = (String[]) properties.get(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY);
+            if (columnIndexes != null) {
+                ps = dto.getConnection().prepareStatement(sql, columnIndexes);
+            } else if (columnNames != null) {
+                ps = dto.getConnection().prepareStatement(sql, columnNames);
+            }
+        }
+        if (properties.size() == 2) {
+            ps = dto.getConnection().prepareStatement(sql,
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
+        }
+        if (properties.size() == 3) {
+            ps = dto.getConnection().prepareStatement(sql,
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
+                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
+        }
+        if (ps == null) {
+            throw new SQLException("Incorrect number of properties for creating a new prepared statement.");
+        }
+
         for (int i = 0; i < params.size(); i++) {
             Parameter parameter = params.get(i);
             this.addParam(dto.getSession(), parameter.getIndex(), ps, params.get(i));
@@ -197,11 +265,11 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
 
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
             if (CollectionUtils.isNotEmpty(params)) {
-                PreparedStatement ps = this.createPreparedStatement(dto, request.getSql(), params);
+                PreparedStatement ps = this.createPreparedStatement(dto, request.getSql(), params, request);
                 String resultSetUUID = this.sessionManager.registerResultSet(dto.getSession(), ps.executeQuery());
                 this.handleResultSet(dto.getSession(), resultSetUUID, responseObserver);
             } else {
-                Statement stmt = dto.getConnection().createStatement();
+                Statement stmt = this.createStatement(dto.getConnection(), request);
                 String resultSetUUID = this.sessionManager.registerResultSet(dto.getSession(),
                         stmt.executeQuery(request.getSql()));
                 this.handleResultSet(dto.getSession(), resultSetUUID, responseObserver);
@@ -626,34 +694,103 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                 throw new SQLException("No active session.");//TODO review might have to create a session in some cases
             }
 
+            CallResourceResponse.Builder responseBuilder = CallResourceResponse.newBuilder();
+
             Object resource = switch (request.getResourceType()) {
-                case RES_RESULT_SET ->
-                        sessionManager.getResultSet(request.getSession(), request.getResourceUUID());
+                case RES_RESULT_SET -> sessionManager.getResultSet(request.getSession(), request.getResourceUUID());
                 case RES_LOB -> sessionManager.getLob(request.getSession(), request.getResourceUUID());
-                case RES_STATEMENT ->
-                        sessionManager.getStatement(request.getSession(), request.getResourceUUID());
-                case RES_PREPARED_STATEMENT ->
-                        sessionManager.getPreparedStatement(request.getSession(), request.getResourceUUID());
-                case RES_CONNECTION -> sessionManager.getConnection(request.getSession());
+                case RES_STATEMENT -> {
+                    ConnectionSessionDTO csDto = sessionConnection(request.getSession(), true);
+                    responseBuilder.setSession(csDto.getSession());
+                    Statement statement = null;
+                    if (!request.getResourceUUID().isBlank()) {
+                        statement = sessionManager.getStatement(csDto.getSession(), request.getResourceUUID());
+                    } else {
+                        statement = csDto.getConnection().createStatement();
+                        String uuid = sessionManager.registerStatement(csDto.getSession(), statement);
+                        responseBuilder.setResourceUUID(uuid);
+                    }
+                    yield statement;
+                }
+                case RES_PREPARED_STATEMENT -> {
+                    ConnectionSessionDTO csDto = sessionConnection(request.getSession(), true);
+                    responseBuilder.setSession(csDto.getSession());
+                    PreparedStatement ps = null;
+                    if (!request.getResourceUUID().isBlank()) {
+                        ps = sessionManager.getPreparedStatement(request.getSession(), request.getResourceUUID());
+                    } else {
+                        Map<String, Object> mapProperties = EMPTY_MAP;
+                        if (!request.getProperties().isEmpty()) {
+                            mapProperties = deserialize(request.getProperties().toByteArray(), Map.class);
+                        }
+                        ps = csDto.getConnection().prepareStatement((String) mapProperties.get(CommonConstants.PREPARED_STATEMENT_SQL_KEY));
+                        String uuid = sessionManager.registerPreparedStatement(csDto.getSession(), ps);
+                        responseBuilder.setResourceUUID(uuid);
+                    }
+                    yield ps;
+                }
+                case RES_CALLABLE_STATEMENT ->
+                        sessionManager.getCallableStatement(request.getSession(), request.getResourceUUID());
+                case RES_CONNECTION -> {
+                    ConnectionSessionDTO csDto = sessionConnection(request.getSession(), true);
+                    responseBuilder.setSession(csDto.getSession());
+                    yield csDto.getConnection();
+                }
+                case RES_SAVEPOINT -> sessionManager.getAttr(request.getSession(), request.getResourceUUID());
                 default -> throw new RuntimeException("Resource type invalid");
             };
 
+            if (responseBuilder.getSession() == null || StringUtils.isBlank(responseBuilder.getSession().getSessionUUID())) {
+                responseBuilder.setSession(request.getSession());
+            }
+
+            List<Object> paramsReceived = (request.getTarget().getParams().size() > 0) ?
+                    deserialize(request.getTarget().getParams().toByteArray(), List.class) : EMPTY_LIST;
             Class<?> clazz = resource.getClass();
-            Method method = clazz.getDeclaredMethod(methodName(request.getTarget()));
-            Object resultFirstLevel = method.invoke(resource);
-            CallResourceResponse.Builder responseBuilder = CallResourceResponse.newBuilder();
+            if (CallType.CALL_RELEASE.equals(request.getTarget().getCallType()) &&
+                "Savepoint".equalsIgnoreCase(request.getTarget().getResourceName())) {
+                Savepoint savepoint = (Savepoint) this.sessionManager.getAttr(request.getSession(),
+                        (String) paramsReceived.get(0));
+                ((Connection) resource).releaseSavepoint(savepoint);
+                responseObserver.onNext(responseBuilder.build());
+                responseObserver.onCompleted();
+                return;
+            }
+            Method method = this.findMethodByName(clazz, methodName(request.getTarget()), paramsReceived);
+            java.lang.reflect.Parameter[] params = method.getParameters();
+            Object resultFirstLevel = null;
+            if (params != null && params.length > 0) {
+                resultFirstLevel = method.invoke(resource, paramsReceived.toArray());
+                if (resultFirstLevel instanceof CallableStatement cs) {
+                    resultFirstLevel = this.sessionManager.registerCallableStatement(responseBuilder.getSession(), cs);
+                }
+            } else {
+                resultFirstLevel = method.invoke(resource);
+                if (resultFirstLevel instanceof Savepoint sp) {
+                    String uuid = UUID.randomUUID().toString();
+                    resultFirstLevel = uuid;
+                    this.sessionManager.registerAttr(responseBuilder.getSession(), uuid, sp);
+                } else if (resultFirstLevel instanceof ResultSet rs) {
+                    resultFirstLevel = this.sessionManager.registerResultSet(responseBuilder.getSession(), rs);
+                }
+            }
             if (request.getTarget().hasNextCall()) {
                 //Second level calls, for cases like getMetadata().isAutoIncrement(int column)
                 Class<?> clazzNext = resultFirstLevel.getClass();
-                Method methodNext = this.findMethodByName(clazzNext, methodName(request.getTarget().getNextCall()));
-                java.lang.reflect.Parameter[] params = methodNext.getParameters();
-                List<Object> paramsReceived = null;
+                List<Object> paramsReceived2 = (request.getTarget().getNextCall().getParams().size() > 0) ?
+                        deserialize(request.getTarget().getNextCall().getParams().toByteArray(), List.class) :
+                        EMPTY_LIST;
+                Method methodNext = this.findMethodByName(clazzNext, methodName(request.getTarget().getNextCall()),
+                        paramsReceived2);
+                params = methodNext.getParameters();
                 Object resultSecondLevel = null;
                 if (params != null && params.length > 0) {
-                    paramsReceived = deserialize(request.getTarget().getNextCall().getParams().toByteArray(), List.class);
-                    resultSecondLevel = methodNext.invoke(resultFirstLevel, paramsReceived.toArray());
+                    resultSecondLevel = methodNext.invoke(resultFirstLevel, paramsReceived2.toArray());
                 } else {
                     resultSecondLevel = methodNext.invoke(resultFirstLevel);
+                }
+                if (resultSecondLevel instanceof ResultSet rs) {
+                    resultSecondLevel = this.sessionManager.registerResultSet(responseBuilder.getSession(), rs);
                 }
                 responseBuilder.setValues(ByteString.copyFrom(serialize(resultSecondLevel)));
             } else {
@@ -669,14 +806,43 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         }
     }
 
-    private Method findMethodByName(Class<?> clazz, String methodName) {
+    private Method findMethodByName(Class<?> clazz, String methodName, List<Object> params) {
         Method[] methods = clazz.getMethods();
         for (Method method : methods) {
             if (methodName.equalsIgnoreCase(method.getName())) {
-                return method;
+                if (method.getParameters().length == params.size()) {
+                    boolean paramTypesMatch = true;
+                    for (int i = 0; i < params.size(); i++) {
+                        java.lang.reflect.Parameter reflectParam = method.getParameters()[i];
+                        Object receivedParam = params.get(i);
+                        //TODO there is a potential issue here, if parameters are received null and more than one method recives the same amount of parameters there is no way to distinguish. Maybe send a Null object with the class type as an attribute and parse it back to null in server is a solution.
+                        Class reflectType = this.getWrapperType(reflectParam.getType());
+                        if (receivedParam != null && (!reflectType.equals(receivedParam.getClass()) &&
+                                !reflectType.isAssignableFrom(receivedParam.getClass()))) {
+                            paramTypesMatch = false;
+                            break;
+                        }
+                    }
+                    if (paramTypesMatch) {
+                        return method;
+                    }
+                }
             }
         }
         throw new RuntimeException("Method " + methodName + " not found in class " + clazz.getName());
+    }
+
+    // Helper method to get the wrapper class for a primitive type
+    private Class<?> getWrapperType(Class<?> primitiveType) {
+        if (primitiveType == int.class) return Integer.class;
+        if (primitiveType == boolean.class) return Boolean.class;
+        if (primitiveType == byte.class) return Byte.class;
+        if (primitiveType == char.class) return Character.class;
+        if (primitiveType == double.class) return Double.class;
+        if (primitiveType == float.class) return Float.class;
+        if (primitiveType == long.class) return Long.class;
+        if (primitiveType == short.class) return Short.class;
+        return primitiveType; // for non-primitives
     }
 
     private String methodName(TargetCall target) throws SQLException {
@@ -684,6 +850,49 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case CALL_IS -> "is";
             case CALL_GET -> "get";
             case CALL_SET -> "set";
+            case CALL_ALL -> "all";
+            case CALL_NULLS -> "nulls";
+            case CALL_USES -> "uses";
+            case CALL_SUPPORTS -> "supports";
+            case CALL_STORES -> "stores";
+            case CALL_NULL -> "null";
+            case CALL_DOES -> "does";
+            case CALL_DATA -> "data";
+            case CALL_NEXT -> "next";
+            case CALL_CLOSE -> "close";
+            case CALL_WAS -> "was";
+            case CALL_CLEAR -> "clear";
+            case CALL_FIND -> "find";
+            case CALL_BEFORE -> "before";
+            case CALL_AFTER -> "after";
+            case CALL_FIRST -> "first";
+            case CALL_LAST -> "last";
+            case CALL_ABSOLUTE -> "absolute";
+            case CALL_RELATIVE -> "relative";
+            case CALL_PREVIOUS -> "previous";
+            case CALL_ROW -> "row";
+            case CALL_UPDATE -> "update";
+            case CALL_INSERT -> "insert";
+            case CALL_DELETE -> "delete";
+            case CALL_REFRESH -> "refresh";
+            case CALL_CANCEL -> "cancel";
+            case CALL_MOVE -> "move";
+            case CALL_OWN -> "own";
+            case CALL_OTHERS -> "others";
+            case CALL_UPDATES -> "updates";
+            case CALL_DELETES -> "deletes";
+            case CALL_INSERTS -> "inserts";
+            case CALL_LOCATORS -> "locators";
+            case CALL_AUTO -> "auto";
+            case CALL_GENERATED -> "generated";
+            case CALL_RELEASE -> "release";
+            case CALL_NATIVE -> "native";
+            case CALL_PREPARE -> "prepare";
+            case CALL_ROLLBACK -> "rollback";
+            case CALL_ABORT -> "abort";
+            case CALL_EXECUTE -> "execute";
+            case CALL_ADD -> "add";
+            case CALL_ENQUOTE -> "enquote";
             case UNRECOGNIZED -> throw new SQLException("CALL type not supported.");
         };
         return prefix + target.getResourceName();

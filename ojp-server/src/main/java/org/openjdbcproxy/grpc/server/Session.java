@@ -2,24 +2,18 @@ package org.openjdbcproxy.grpc.server;
 
 import com.openjdbcproxy.grpc.SessionInfo;
 import lombok.Getter;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
-import java.io.InputStream;
-import java.sql.Blob;
-import java.sql.Clob;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Holds information about a session of a given client.
@@ -37,6 +31,7 @@ public class Session {
     private Map<String, ResultSet> resultSetMap;
     private Map<String, Statement> statementMap;
     private Map<String, PreparedStatement> preparedStatementMap;
+    private Map<String, CallableStatement> callableStatementMap;
     private Map<String, Object> lobMap;
     private Map<String, Object> attrMap;
     private boolean closed;
@@ -50,6 +45,7 @@ public class Session {
         this.resultSetMap = new ConcurrentHashMap<>();
         this.statementMap = new ConcurrentHashMap<>();
         this.preparedStatementMap = new ConcurrentHashMap<>();
+        this.callableStatementMap = new ConcurrentHashMap<>();
         this.lobMap = new ConcurrentHashMap<>();
         this.attrMap = new ConcurrentHashMap<>();
     }
@@ -103,9 +99,21 @@ public class Session {
         return this.preparedStatementMap.get(uuid);
     }
 
+    public void addCallableStatement(String uuid, CallableStatement cs) {
+        this.notClosed();
+        this.callableStatementMap.put(uuid, cs);
+    }
+
+    public CallableStatement getCallableStatement(String uuid) {
+        this.notClosed();
+        return this.callableStatementMap.get(uuid);
+    }
+
     public void addLob(String uuid, Object o) {
         this.notClosed();
-        this.lobMap.put(uuid, o);
+        if (o != null) {
+            this.lobMap.put(uuid, o);
+        }
     }
 
     public <T> T getLob(String uuid) {

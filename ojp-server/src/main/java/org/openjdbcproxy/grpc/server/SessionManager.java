@@ -1,17 +1,14 @@
 package org.openjdbcproxy.grpc.server;
 
-import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.SessionInfo;
 
-import java.sql.Blob;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Collection;
-import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * Manages sessions established with clients
@@ -26,6 +23,8 @@ public interface SessionManager {
     Statement getStatement(SessionInfo sessionInfo, String uuid);
     String registerPreparedStatement(SessionInfo sessionInfo, PreparedStatement ps);
     PreparedStatement getPreparedStatement(SessionInfo sessionInfo, String uuid);
+    String registerCallableStatement(SessionInfo sessionInfo, CallableStatement cs);
+    CallableStatement getCallableStatement(SessionInfo sessionInfo, String uuid);
     void registerLob(SessionInfo sessionInfo, Object o, String lobUuid);
     <T> T getLob(SessionInfo sessionInfo, String uuid);
     Collection<Object> getLobs(SessionInfo sessionInfo);

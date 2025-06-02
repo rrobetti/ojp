@@ -100,6 +100,7 @@
                     <!--TODO Without order the multiple drivers used in tests will conflict, once moved to use only OJP no longer needed-->
                     <runOrder>alphabetical</runOrder>
                 </configuration>
+                <version>3.2.5</version>
             </plugin>
         </plugins>
     </build>

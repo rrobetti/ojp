@@ -5,39 +5,60 @@ import com.openjdbcproxy.grpc.CallResourceRequest;
 import com.openjdbcproxy.grpc.CallResourceResponse;
 import com.openjdbcproxy.grpc.CallType;
 import com.openjdbcproxy.grpc.ResourceType;
-import com.openjdbcproxy.grpc.SessionInfo;
 import com.openjdbcproxy.grpc.TargetCall;
+import org.apache.commons.lang3.StringUtils;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
 
-import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
+import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
 
 public class ResultSetMetaData implements java.sql.ResultSetMetaData {
-    private final SessionInfo session;
-    private final String resultSetUUID;
     private final StatementService statementService;
-    private final ResultSet resultSet;
+    private final RemoteProxyResultSet resultSet;
+    private final PreparedStatement ps;
 
-    public ResultSetMetaData(SessionInfo session, String resultSetUUID, ResultSet resultSet, StatementService statementService) {
-        this.session = session;
-        this.resultSetUUID = resultSetUUID;
+    public ResultSetMetaData(RemoteProxyResultSet resultSet, StatementService statementService) {
         this.resultSet = resultSet;
         this.statementService = statementService;
+        this.ps = null;
+    }
+
+    public ResultSetMetaData(PreparedStatement ps, StatementService statementService) {
+        this.ps = ps;
+        this.statementService = statementService;
+        this.resultSet = null;
     }
 
     @Override
     public int getColumnCount() throws SQLException {
-        return resultSet.getLabelsMap().size();
+        if (resultSet instanceof org.openjdbcproxy.jdbc.ResultSet rs) {
+            return rs.getLabelsMap().size();
+        } else {
+            return this.retrieveMetadataAttribute(CallType.CALL_GET, "ColumnCount",-1, Integer.class);
+        }
     }
 
-    private CallResourceRequest.Builder newCallBuilder() {
-        return CallResourceRequest.newBuilder()
-                .setSession(this.session)
-                .setResourceType(ResourceType.RES_RESULT_SET)
-                .setResourceUUID(this.resultSetUUID);
+    private CallResourceRequest.Builder newCallBuilder() throws SQLException {
+        if (this.resultSet != null) {
+            return CallResourceRequest.newBuilder()
+                    .setSession(this.resultSet.getConnection().getSession())
+                    .setResourceType(ResourceType.RES_RESULT_SET)
+                    .setResourceUUID(this.resultSet.getResultSetUUID());
+        } else if (this.ps != null) {
+            CallResourceRequest.Builder builder = CallResourceRequest.newBuilder()
+                    .setSession(this.ps.getConnection().getSession())
+                    .setResourceType(ResourceType.RES_PREPARED_STATEMENT)
+                    .setProperties(ByteString.copyFrom(serialize(this.ps.getProperties())));
+            if (StringUtils.isNotBlank(this.ps.getPrepareStatementUUID())) {
+                    builder.setResourceUUID(this.ps.getPrepareStatementUUID());
+            }
+            return builder;
+        }
+        throw new RuntimeException("A result set or a prepared statement reference is required.");
     }
 
     @Override
@@ -152,7 +173,10 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData {
 
     private <T> T retrieveMetadataAttribute(CallType callType, String attrName, Integer column,  Class returnType) throws SQLException {
         CallResourceRequest.Builder reqBuilder = this.newCallBuilder();
-        List<Object> params = List.of(Integer.valueOf(column));
+        List<Object> params = Constants.EMPTY_OBJECT_LIST;
+        if (column > -1) {
+            params = Arrays.asList(Integer.valueOf(column));
+        }
         reqBuilder.setTarget(
                 TargetCall.newBuilder()
                         .setCallType(CallType.CALL_GET)
@@ -165,6 +189,11 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData {
                         .build()
         );
         CallResourceResponse response = this.statementService.callResource(reqBuilder.build());
+        if (this.resultSet !=null) {
+            this.resultSet.getConnection().setSession(response.getSession());
+        } else if (this.ps != null) {
+            this.ps.getConnection().setSession(response.getSession());
+        }
         return (T) deserialize(response.getValues().toByteArray(), returnType);
     }
 }

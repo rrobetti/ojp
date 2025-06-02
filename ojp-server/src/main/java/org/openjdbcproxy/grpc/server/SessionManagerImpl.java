@@ -5,6 +5,7 @@ import com.openjdbcproxy.grpc.TransactionStatus;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -17,7 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
-public class SessionManagerImpl implements SessionManager{
+public class SessionManagerImpl implements SessionManager {
 
     private Map<String, String> connectionHashMap = new ConcurrentHashMap<>();
     private Map<String, Session> sessionMap = new ConcurrentHashMap<>();
@@ -39,8 +40,9 @@ public class SessionManagerImpl implements SessionManager{
 
     @Override
     public Connection getConnection(SessionInfo sessionInfo) {
-        log.debug("Getting a connection for session {}", sessionInfo.getSessionUUID() );
-        return this.sessionMap.get(sessionInfo.getSessionUUID()).getConnection();
+        log.debug("Getting a connection for session {}", sessionInfo.getSessionUUID());
+        Session session = this.sessionMap.get(sessionInfo.getSessionUUID());
+        return session != null ? session.getConnection() : null;
     }
 
     @Override
@@ -80,6 +82,18 @@ public class SessionManagerImpl implements SessionManager{
     }
 
     @Override
+    public String registerCallableStatement(SessionInfo sessionInfo, CallableStatement cs) {
+        String uuid = UUID.randomUUID().toString();
+        this.sessionMap.get(sessionInfo.getSessionUUID()).addCallableStatement(uuid, cs);
+        return uuid;
+    }
+
+    @Override
+    public CallableStatement getCallableStatement(SessionInfo sessionInfo, String uuid) {
+        return this.sessionMap.get(sessionInfo.getSessionUUID()).getCallableStatement(uuid);
+    }
+
+    @Override
     public void registerLob(SessionInfo sessionInfo, Object lob, String lobUuid) {
         this.sessionMap.get(sessionInfo.getSessionUUID()).addLob(lobUuid, lob);
     }
@@ -96,7 +110,7 @@ public class SessionManagerImpl implements SessionManager{
 
     @Override
     public void terminateSession(SessionInfo sessionInfo) throws SQLException {
-        log.info("Terminating session -> " + sessionInfo.getSessionUUID() );
+        log.info("Terminating session -> " + sessionInfo.getSessionUUID());
         Session targetSession = this.sessionMap.remove(sessionInfo.getSessionUUID());
 
         if (TransactionStatus.TRX_ACTIVE.equals(sessionInfo.getTransactionInfo().getTransactionStatus())) {

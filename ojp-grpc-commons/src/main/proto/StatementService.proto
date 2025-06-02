@@ -54,7 +54,8 @@ message StatementRequest {
     SessionInfo session = 1;
     string sql = 2;
     bytes parameters = 3;
-    string preparedStatementUUID = 4;
+    string statementUUID = 4;
+    bytes properties = 5;
 }
 
 message SqlErrorResponse {
@@ -68,6 +69,9 @@ enum LobType {
     LT_BLOB = 0;
     LT_CLOB = 1;
     LT_BINARY_STREAM = 2;
+    LT_ASCII_STREAM = 3;
+    LT_UNICODE_STREAM = 4;
+    LT_CHARACTER_STREAM = 5;
 }
 
 message LobReference {
@@ -100,14 +104,59 @@ enum ResourceType {
     RES_RESULT_SET = 0;
     RES_STATEMENT = 1;
     RES_PREPARED_STATEMENT = 2;
-    RES_LOB = 3;
-    RES_CONNECTION = 4;
+    RES_CALLABLE_STATEMENT = 3;
+    RES_LOB = 4;
+    RES_CONNECTION = 5;
+    RES_SAVEPOINT = 6;
 }
 
 enum CallType {
     CALL_SET = 0;
     CALL_GET = 1;
     CALL_IS = 2;
+    CALL_ALL = 3;
+    CALL_NULLS = 4;
+    CALL_USES = 5;
+    CALL_SUPPORTS = 6;
+    CALL_STORES = 7;
+    CALL_NULL = 8;
+    CALL_DOES = 9;
+    CALL_DATA = 10;
+    CALL_NEXT = 11;
+    CALL_CLOSE = 12;
+    CALL_WAS = 13;
+    CALL_CLEAR = 14;
+    CALL_FIND = 15;
+    CALL_BEFORE = 16;
+    CALL_AFTER = 17;
+    CALL_FIRST = 18;
+    CALL_LAST = 19;
+    CALL_ABSOLUTE = 20;
+    CALL_RELATIVE = 21;
+    CALL_PREVIOUS = 22;
+    CALL_ROW = 23;
+    CALL_UPDATE = 24;
+    CALL_INSERT = 25;
+    CALL_DELETE = 26;
+    CALL_REFRESH = 27;
+    CALL_CANCEL = 28;
+    CALL_MOVE = 29;
+    CALL_OWN = 30;
+    CALL_OTHERS = 31;
+    CALL_UPDATES = 32;
+    CALL_DELETES = 33;
+    CALL_INSERTS = 34;
+    CALL_LOCATORS = 35;
+    CALL_AUTO = 36;
+    CALL_GENERATED = 37;
+    CALL_RELEASE = 38;
+    CALL_NATIVE = 39;
+    CALL_PREPARE = 40;
+    CALL_ROLLBACK = 41;
+    CALL_ABORT = 42;
+    CALL_EXECUTE = 43;
+    CALL_ADD = 44;
+    CALL_ENQUOTE = 45;
 }
 
 message TargetCall {
@@ -122,10 +171,13 @@ message CallResourceRequest {
     ResourceType resourceType = 2;
     string resourceUUID = 3;
     TargetCall target = 4;
+    bytes properties = 5;
 }
 
 message CallResourceResponse {
-    bytes values = 1;
+    SessionInfo session = 1;
+    string resourceUUID = 2;
+    bytes values = 3;
 }
 
 service StatementService {

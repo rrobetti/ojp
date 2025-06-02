@@ -26,6 +26,7 @@ import org.openjdbcproxy.jdbc.LobGrpcIterator;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
@@ -60,17 +61,23 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException {
-        return this.executeUpdate(sessionInfo, sql, params, "");
+    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params,
+                                  Map<String, Object> properties) throws SQLException {
+        return this.executeUpdate(sessionInfo, sql, params, "", properties);
     }
 
     @Override
-    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params, String preparedStatementUUID)
+    public OpResult executeUpdate(SessionInfo sessionInfo, String sql, List<Parameter> params, String statementUUID,
+                                  Map<String, Object> properties)
             throws SQLException {
         try {
-            return this.statemetServiceBlockingStub.executeUpdate(StatementRequest.newBuilder()
+            StatementRequest.Builder builder =  StatementRequest.newBuilder();
+            if (properties != null) {
+                builder.setProperties(ByteString.copyFrom(serialize(properties)));
+            }
+            return this.statemetServiceBlockingStub.executeUpdate(builder
                     .setSession(sessionInfo)
-                    .setPreparedStatementUUID(preparedStatementUUID != null ? preparedStatementUUID : "")
+                    .setStatementUUID(statementUUID != null ? statementUUID : "")
                     .setSql(sql)
                     .setParameters(ByteString.copyFrom(serialize(params)))
                     .build());
@@ -80,9 +87,21 @@ public class StatementServiceGrpcClient implements StatementService {
     }
 
     @Override
-    public Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params) throws SQLException {
+    public Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params,
+                                           Map<String, Object> properties) throws SQLException {
+        return this.executeQuery(sessionInfo, sql, params, "", properties);
+    }
+
+    @Override
+    public Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params, String statementUUID,
+                                           Map<String, Object> properties) throws SQLException {
         try {
-            return this.statemetServiceBlockingStub.executeQuery(StatementRequest.newBuilder()
+            StatementRequest.Builder builder =  StatementRequest.newBuilder();
+            if (properties != null) {
+                builder.setProperties(ByteString.copyFrom(serialize(properties)));
+            }
+            return this.statemetServiceBlockingStub.executeQuery(builder
+                    .setStatementUUID(statementUUID != null ? statementUUID : "")
                     .setSession(sessionInfo).setSql(sql).setParameters(ByteString.copyFrom(serialize(params))).build());
         } catch (StatusRuntimeException e) {
             throw handle(e);
