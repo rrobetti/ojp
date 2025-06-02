@@ -85,10 +85,10 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 - ✅ Binary Stream support.
 - ✅ ResultSet metadata enquiring.
 - ❌ CLOB support.
-- 🕓 Statement and Prepared statement advanced features.
-- 🕓 Connection advanced features.
+- ✅ Statement and Prepared statement advanced features.
+- ✅ Connection advanced features.
 - ❌ OpenTelemetry implementation.
-- ❌ Docker image implementation.
+- 🕓 Docker image implementation.
 - ❌ Support for Spring Boot/Spring Data.
 - ❌ Support for Micronaut.
 - ❌ Support for Quarkus.

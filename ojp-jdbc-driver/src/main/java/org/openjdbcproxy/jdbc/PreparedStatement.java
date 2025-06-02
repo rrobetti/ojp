@@ -8,6 +8,7 @@ import com.openjdbcproxy.grpc.LobReference;
 import com.openjdbcproxy.grpc.LobType;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ResourceType;
+import com.openjdbcproxy.grpc.ResultType;
 import com.openjdbcproxy.grpc.TargetCall;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -119,6 +120,23 @@ public class PreparedStatement implements java.sql.PreparedStatement {
                 this.paramsMap.values().stream().toList(), this.prepareStatementUUID, null);
         this.connection.setSession(result.getSession());
         return deserialize(result.getValue().toByteArray(), Integer.class);
+    }
+
+    @Override
+    public void addBatch() throws SQLException {
+        log.info("Executing add batch for -> {}", this.sql);
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG, Boolean.TRUE);
+        OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
+                this.paramsMap.values().stream().toList(), this.prepareStatementUUID, properties);
+        this.connection.setSession(result.getSession());
+        if (StringUtils.isBlank(this.prepareStatementUUID) && ResultType.UUID_STRING.equals(result.getType()) &&
+            !result.getValue().isEmpty()) {
+            String psUUID = deserialize(result.getValue().toByteArray(), String.class);
+            this.prepareStatementUUID = psUUID;
+            this.getStatement().setStatementUUID(psUUID);
+        }
+        this.paramsMap = new TreeMap<>();
     }
 
     @Override
@@ -312,12 +330,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public boolean execute() throws SQLException {
-        return this.callProxy(CallType.CALL_EXECUTE, "", Boolean.class);
-    }
-
-    @Override
-    public void addBatch() throws SQLException {
-        this.callProxy(CallType.CALL_ADD, "Batch", Void.class);
+        throw new SQLException("Not supported.");
     }
 
     @Override

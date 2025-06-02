@@ -7,6 +7,7 @@ import com.openjdbcproxy.grpc.CallType;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ResourceType;
 import com.openjdbcproxy.grpc.TargetCall;
+import lombok.Setter;
 import org.openjdbcproxy.grpc.client.StatementService;
 
 import java.sql.SQLException;
@@ -29,6 +30,7 @@ public class Statement implements java.sql.Statement {
     private ResultSet lastResultSet;
     private int lastUpdateCount;
     private boolean closed;
+    @Setter
     private String statementUUID;
     private int maxRows;
     private ResourceType resourceType;

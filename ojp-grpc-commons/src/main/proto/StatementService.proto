@@ -42,6 +42,7 @@ message ResultSetId {
 enum ResultType {
     INTEGER = 0;
     RESULT_SET_DATA = 1;
+    UUID_STRING = 2;
 }
 
 message OpResult {

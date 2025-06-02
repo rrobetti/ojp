@@ -134,9 +134,10 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         ConnectionSessionDTO dto = ConnectionSessionDTO.builder().build();
 
         Statement stmt = null;
+        String psUUID = "";
 
         try {
-            dto = sessionConnection(request.getSession(), false);
+            dto = sessionConnection(request.getSession(), this.isAddBatchOperation(request));
 
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
             PreparedStatement ps = dto.getSession() != null && StringUtils.isNotBlank(dto.getSession().getSessionUUID())
@@ -152,20 +153,39 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         ps.setBinaryStream(parameterIndex, lobIS);
                     }
                     sessionManager.waitLobStreamsConsumption(dto.getSession());
+                    if (ps != null) {
+                        this.addParametersPreparedStatement(dto, ps, params);
+                    }
                 } else {
                     ps = this.createPreparedStatement(dto, request.getSql(), params, request);
                 }
-                updated = ps.executeUpdate();
+                if (this.isAddBatchOperation(request)) {
+                    ps.addBatch();
+                    if (request.getStatementUUID().isBlank()) {
+                        psUUID = sessionManager.registerPreparedStatement(dto.getSession(), ps);
+                    } else {
+                        psUUID = request.getStatementUUID();
+                    }
+                } else {
+                    updated = ps.executeUpdate();
+                }
                 stmt = ps;
             } else {
                 stmt = this.createStatement(dto.getConnection(), request);
                 updated = stmt.executeUpdate(request.getSql());
             }
 
-            responseObserver.onNext(OpResult.newBuilder()
-                    .setType(ResultType.INTEGER)
-                    .setSession(returnSessionInfo)
-                    .setValue(ByteString.copyFrom(serialize(updated))).build());
+            if (this.isAddBatchOperation(request)) {
+                responseObserver.onNext(OpResult.newBuilder()
+                        .setType(ResultType.UUID_STRING)
+                        .setSession(returnSessionInfo)
+                        .setValue(ByteString.copyFrom(serialize(psUUID))).build());
+            } else {
+                responseObserver.onNext(OpResult.newBuilder()
+                        .setType(ResultType.INTEGER)
+                        .setSession(returnSessionInfo)
+                        .setValue(ByteString.copyFrom(serialize(updated))).build());
+            }
             responseObserver.onCompleted();
         } catch (SQLException e) {// Need a second catch just for the acquisition of the connection
             log.error("Failure during update execution: " + e.getMessage(), e);
@@ -182,6 +202,14 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                 }
             }
         }
+    }
+
+    private boolean isAddBatchOperation(StatementRequest request) {
+        if (request.getProperties().isEmpty()) {
+            return false;
+        }
+        Map<String, Object> properties = deserialize(request.getProperties().toByteArray(), Map.class);
+        return (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
     }
 
     private Statement createStatement(Connection connection, StatementRequest request) throws SQLException {
@@ -229,32 +257,39 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
         if (properties.size() == 1) {
             int[] columnIndexes = (int[]) properties.get(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY);
             String[] columnNames = (String[]) properties.get(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY);
+            Boolean isAddBatch = (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
             if (columnIndexes != null) {
                 ps = dto.getConnection().prepareStatement(sql, columnIndexes);
             } else if (columnNames != null) {
                 ps = dto.getConnection().prepareStatement(sql, columnNames);
+            } else if (isAddBatch) {
+                ps = dto.getConnection().prepareStatement(sql);
             }
         }
-        if (properties.size() == 2) {
-            ps = dto.getConnection().prepareStatement(sql,
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
+        Integer resultSetType = (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY);
+        Integer resultSetConcurrency = (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY);
+        Integer resultSetHoldability = (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY);
+
+        if (resultSetType != null && resultSetConcurrency != null && resultSetHoldability == null) {
+            ps = dto.getConnection().prepareStatement(sql, resultSetType, resultSetConcurrency);
         }
-        if (properties.size() == 3) {
-            ps = dto.getConnection().prepareStatement(sql,
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
+        if (resultSetType != null && resultSetConcurrency != null && resultSetHoldability != null) {
+            ps = dto.getConnection().prepareStatement(sql, resultSetType, resultSetConcurrency, resultSetHoldability);
         }
         if (ps == null) {
             throw new SQLException("Incorrect number of properties for creating a new prepared statement.");
         }
 
+        this.addParametersPreparedStatement(dto, ps, params);
+        return ps;
+    }
+
+    private void addParametersPreparedStatement(ConnectionSessionDTO dto, PreparedStatement ps, List<Parameter> params)
+            throws SQLException {
         for (int i = 0; i < params.size(); i++) {
             Parameter parameter = params.get(i);
             this.addParam(dto.getSession(), parameter.getIndex(), ps, params.get(i));
         }
-        return ps;
     }
 
     @Override
