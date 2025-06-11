@@ -18,7 +18,7 @@ A JDBC driver and proxy server to decouple applications from relational database
 
 * The OJB JDBC driver is used as a replacement for the native JDBC driver(s) previously used with minimum change, the only change required being prefixing the connection URL with ojp_. For example: 
 ```
-ojp_postgresql://user@localhost
+ojp_[localhost:1059]postgresql://user@localhost
 ```
 instead of:
 ```
@@ -30,7 +30,7 @@ postgresql://user@localhost
 ```
         Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
-                getConnection("jdbc:ojp_h2:~/test", "sa", "");
+                getConnection("jdbc:ojp[host:port]_h2:~/test", "sa", "");
 
         java.sql.PreparedStatement psSelect = conn.prepareStatement("select * from test_table where id = ?");
         psSelect.setInt(1, 1);
@@ -42,9 +42,10 @@ postgresql://user@localhost
 * **GRPC protocol** is used to facilitate the connection of the OJP JDBC Driver and the OJP Proxy Server allowing for efficient data transmission over a multiplex channel.
 * OJP Proxy server uses **HikariCP** connection pools to efficiently manage connections.
 * OJP supports **multiple relational databases**, in theory it can support any relational database that currently provides a JDBC driver implementation.
+* OJP simple setup just requires OJP lib to be in the classpath and  the OJP prefix to be added to the connection URL as in jdbc:ojp[host:port]_h2:~/test. where host:port represents the location of the proxy server.
  
 ## Vision
-The goal of the OJP project is to provide a free and open-source solution for a relational database-agnostic proxy connection pool. The project is designed to help efficiently manage database connections in microservices, event-driven architectures, or serverless environments while maintaining high scalability and performance.
+Provide a free and open-source solution for a relational database-agnostic proxy connection pool. The project is designed to help efficiently manage database connections in microservices, event-driven architectures, or serverless environments while maintaining high scalability and performance.
 
 ## Target problem
 In modern architectures, such as microservices, event-driven systems, or serverless (Lambda) architectures, a common issue arises in managing the number of open connections to relational databases. When applications need to elastically scale, they often maintain too many database connections. These connections can be held for longer than necessary, locking resources and making scalability difficult. In some cases, this can lead to excessive resource consumption, placing immense pressure on the database. In extreme scenarios, this can even result in database outages.
@@ -57,7 +58,7 @@ This intelligent allocation of connections helps prevent overloading databases a
 
 ### ojp-server
 The ojp-server is a gRPC server that manages a Hikari connection pool and abstracts the creation and management of database connections. It supports one or multiple relational databases and provides virtual connections to the ojp-jdbc-driver. The server ensures the number of open real connections is always under control, according to predefined settings, improving database scalability.
-#### How to start
+#### How to start from source code
 >Build the ojp-grpc-commons first.
 
 > Run the class GrpcServer main method.
@@ -76,6 +77,13 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 #### How to build
 ``mvn clean install``
 
+## Partners
+<a href=https://www.linkedin.com/in/devsjava/>
+<img width="150px" height="150px" src="documents/images/comunidade_brasil_jug.jpeg" alt="Comunidade Brasil JUG" />
+</a>
+<a href=https://github.com/switcherapi/switcher-api>
+<img width="180px" height="120px" src="documents/images/switcherapi_grey.png" alt="Comunidade Brasil JUG" />
+</a>
 
 ## Feature implementation status
 - ✅ Basic CRUD operations.
@@ -97,7 +105,8 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 - ❌ Configurable data sources by user and/or database. 
 - ❌ RAFT consensus POC.
 - ❌ RAFT and connection smart balancing and resizing.
-- ❌ Docker compose for (RAFT) cluster.
+- ❌ Docker compose for (RAFT) cluster. 
+Other feature candidates: Query Routing, Sharding, Query Caching, Read/Write Splitting, Multi-Cloud/Distributed Clustering, Authentication Integration, Advanced Security Features, Failover and Automatic Replication Awareness 
 
 ✅ - Done
 ❌ - Not started

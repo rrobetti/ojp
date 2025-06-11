@@ -1089,10 +1089,6 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             }
             case BINARY_STREAM -> {
                 InputStream is = (InputStream) param.getValues().getFirst();
-                //TODO remove
-                if (is instanceof LobDataBlocksInputStream lis) {
-                    log.info("Adding lob {} parameter to prepared statement.", lis.getUuid());
-                }
                 if (param.getValues().size() > 1) {
                     Long size = (Long) param.getValues().get(1);
                     ps.setBinaryStream(idx, is, size);
