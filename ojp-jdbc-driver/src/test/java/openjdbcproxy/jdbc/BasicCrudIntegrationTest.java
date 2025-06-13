@@ -2,6 +2,8 @@ package openjdbcproxy.jdbc;
 
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
 
@@ -15,9 +17,18 @@ import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 @Slf4j
 public class BasicCrudIntegrationTest {
 
+    private static boolean isTestDisabled;
+
+    @BeforeAll
+    public static void setup() {
+        isTestDisabled = Boolean.parseBoolean(System.getProperty("disablePostgresTests", "false"));
+    }
+
     @ParameterizedTest
     @CsvFileSource(resources = "/h2_postgres_connections.csv")
     public void crudTestSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException {
+        Assumptions.assumeFalse(isTestDisabled, "Skipping Postgres tests");
+
         Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 

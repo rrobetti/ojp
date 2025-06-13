@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <parent>
+    <artifactId>ojp-parent</artifactId>
+    <groupId>org.openjdbcproxy</groupId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.example</groupId>
   <artifactId>ojp-server</artifactId>
   <version>1.0-SNAPSHOT</version>
   <build>
@@ -52,10 +56,7 @@
     </dependency>
   </dependencies>
   <properties>
-    <maven.compiler.target>22</maven.compiler.target>
     <slf4j.version>2.0.17</slf4j.version>
-    <maven.compiler.source>22</maven.compiler.source>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <grpc.version>1.70.0</grpc.version>
   </properties>
 </project>
