@@ -58,24 +58,27 @@ This intelligent allocation of connections helps prevent overloading databases a
 
 ### ojp-server
 The ojp-server is a gRPC server that manages a Hikari connection pool and abstracts the creation and management of database connections. It supports one or multiple relational databases and provides virtual connections to the ojp-jdbc-driver. The server ensures the number of open real connections is always under control, according to predefined settings, improving database scalability.
-#### How to start from source code
->Build the ojp-grpc-commons first.
-
-> Run the class GrpcServer main method.
 
 ### ojp-jdbc-driver
 The ojp-jdbc-driver is an implementation of the JDBC specification. It connects to the ojp-server via the gRPC protocol, sending SQL statements to be executed against the database and reading the responses. The driver works with virtual connections provided by the ojp-server, allowing the application to interact with the database without directly managing real database connections.
-#### How to run
->Build the ojp-grpc-commons first.
-
->Run any integration tests, the ojp-server is expected to be running in the same machine.
-
-Connections configuration: There are csv files under test/resources with connection details defaulted to H2 database, the name of each file implies which database connections can be added to it, for example the file h2_postgres_connections.csv can contain connections to H2 and/or postgres databases, integration tests classes that relly on this file will run all their tests against each connection in the file. 
 
 ### ojp-grpc-commons
 The ojp-grpc-commons module contains the shared gRPC contracts used between the ojp-server and ojp-jdbc-driver. These contracts define the communication protocol and structure for requests and responses exchanged between the server and the driver.
-#### How to build
-``mvn clean install``
+
+## How to build & test
+
+### Build modules
+
+``mvn clean install -DskipTests``
+
+### Run ojp-server
+
+``mvn verify -pl ojp-server -Prun-ojp-server``
+
+### Run tests
+Connections configuration: There are csv files under test/resources with connection details defaulted to H2 database, the name of each file implies which database connections can be added to it, for example the file h2_postgres_connections.csv can contain connections to H2 and/or postgres databases, integration tests classes that relly on this file will run all their tests against each connection in the file.
+
+``mvn test``
 
 ## Partners
 <a href=https://www.linkedin.com/in/devsjava/>

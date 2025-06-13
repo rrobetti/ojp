@@ -3,4 +3,4 @@
 
 # ignore all files in any directory named .idea
 */.idea/
-
+.idea/
