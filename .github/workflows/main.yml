@@ -29,7 +29,7 @@ jobs:
         run: mvn clean install -DskipTests
 
       - name: Run ojp-server
-        run: mvn verify -pl ojp-server -Prun-ojp-server
+        run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
 
       - name: Run tests
         run: mvn test -DdisablePostgresTests
