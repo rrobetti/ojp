@@ -63,6 +63,10 @@ The ojp-server is a gRPC server that manages a Hikari connection pool and abstra
 
 > Run the class GrpcServer main method.
 
+#### How to start a docker image
+
+> docker run --rm -d -p 1059:1059 rrobetti/ojp:0.0.1-alpha
+
 ### ojp-jdbc-driver
 The ojp-jdbc-driver is an implementation of the JDBC specification. It connects to the ojp-server via the gRPC protocol, sending SQL statements to be executed against the database and reading the responses. The driver works with virtual connections provided by the ojp-server, allowing the application to interact with the database without directly managing real database connections.
 #### How to run
