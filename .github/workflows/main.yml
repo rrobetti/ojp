@@ -12,6 +12,21 @@ jobs:
     runs-on: ubuntu-latest
     if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: defaultdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     steps:
       - name: Git checkout
         uses: actions/checkout@v4
@@ -32,4 +47,4 @@ jobs:
         run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
 
       - name: Run tests
-        run: mvn test -DdisablePostgresTests
+        run: mvn test

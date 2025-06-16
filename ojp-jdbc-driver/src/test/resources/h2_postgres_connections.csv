@@ -1,2 +1,2 @@
 org.openjdbcproxy.jdbc.Driver,jdbc:ojp[localhost:1059]_h2:~/test,sa,
-org.openjdbcproxy.jdbc.Driver,jdbc:ojp[localhost:1059]_postgresql://:25060/defaultdb?sslmode=require,,
+org.openjdbcproxy.jdbc.Driver,jdbc:ojp[localhost:1059]_postgresql://:5432/defaultdb,testuser,testpassword
