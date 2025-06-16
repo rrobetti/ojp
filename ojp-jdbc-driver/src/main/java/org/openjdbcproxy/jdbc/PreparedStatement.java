@@ -10,7 +10,6 @@ import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ResourceType;
 import com.openjdbcproxy.grpc.ResultType;
 import com.openjdbcproxy.grpc.TargetCall;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.openjdbcproxy.constants.CommonConstants;
@@ -43,7 +42,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
@@ -79,17 +77,15 @@ import static org.openjdbcproxy.grpc.dto.ParameterType.UNICODE_STREAM;
 import static org.openjdbcproxy.grpc.dto.ParameterType.URL;
 
 @Slf4j
-public class PreparedStatement implements java.sql.PreparedStatement {
+public class PreparedStatement extends Statement implements java.sql.PreparedStatement {
     private final Connection connection;
     private String sql;
     private SortedMap<Integer, Parameter> paramsMap;
     private Map<String, Object> properties;
     private StatementService statementService;
-    @Getter
-    private String prepareStatementUUID;//If present represents the UUID of this PreparedStatement in the server
-    private Statement statement;
 
     public PreparedStatement(Connection connection, String sql, StatementService statementService) {
+        super(connection, statementService, null, ResourceType.RES_PREPARED_STATEMENT);
         this.connection = connection;
         this.sql = sql;
         this.properties = null;
@@ -99,6 +95,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     public PreparedStatement(Connection connection, String sql, StatementService statementService,
                              Map<String, Object> properties) {
+        super(connection, statementService, properties, ResourceType.RES_PREPARED_STATEMENT);
         this.connection = connection;
         this.sql = sql;
         this.properties = properties;
@@ -108,6 +105,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public ResultSet executeQuery() throws SQLException {
+        this.checkClosed();
         Iterator<OpResult> itOpResult = this.statementService
                 .executeQuery(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList(), this.properties);
         return new ResultSet(itOpResult, this.statementService, this);
@@ -115,32 +113,34 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public int executeUpdate() throws SQLException {
+        this.checkClosed();
         log.info("Executing update for -> {}", this.sql);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
-                this.paramsMap.values().stream().toList(), this.prepareStatementUUID, null);
+                this.paramsMap.values().stream().toList(), this.getStatementUUID(), null);
         this.connection.setSession(result.getSession());
         return deserialize(result.getValue().toByteArray(), Integer.class);
     }
 
     @Override
     public void addBatch() throws SQLException {
+        this.checkClosed();
         log.info("Executing add batch for -> {}", this.sql);
         Map<String, Object> properties = new HashMap<>();
         properties.put(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG, Boolean.TRUE);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
-                this.paramsMap.values().stream().toList(), this.prepareStatementUUID, properties);
+                this.paramsMap.values().stream().toList(), this.getStatementUUID(), properties);
         this.connection.setSession(result.getSession());
-        if (StringUtils.isBlank(this.prepareStatementUUID) && ResultType.UUID_STRING.equals(result.getType()) &&
+        if (StringUtils.isBlank(this.getStatementUUID()) && ResultType.UUID_STRING.equals(result.getType()) &&
             !result.getValue().isEmpty()) {
             String psUUID = deserialize(result.getValue().toByteArray(), String.class);
-            this.prepareStatementUUID = psUUID;
-            this.getStatement().setStatementUUID(psUUID);
+            this.setStatementUUID(psUUID);
         }
         this.paramsMap = new TreeMap<>();
     }
 
     @Override
     public void setNull(int parameterIndex, int sqlType) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(NULL)
@@ -150,6 +150,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBoolean(int parameterIndex, boolean x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BOOLEAN)
@@ -160,6 +161,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setByte(int parameterIndex, byte x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BYTE)
@@ -170,6 +172,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setShort(int parameterIndex, short x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(SHORT)
@@ -180,6 +183,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setInt(int parameterIndex, int x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(INT)
@@ -190,6 +194,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setLong(int parameterIndex, long x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(LONG)
@@ -200,6 +205,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setFloat(int parameterIndex, float x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(FLOAT)
@@ -210,6 +216,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setDouble(int parameterIndex, double x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DOUBLE)
@@ -220,6 +227,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBigDecimal(int parameterIndex, BigDecimal x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BIG_DECIMAL)
@@ -230,6 +238,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setString(int parameterIndex, String x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(STRING)
@@ -240,6 +249,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBytes(int parameterIndex, byte[] x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(BYTES)
@@ -250,6 +260,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setDate(int parameterIndex, Date x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DATE)
@@ -260,6 +271,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setTime(int parameterIndex, Time x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIME)
@@ -270,6 +282,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIMESTAMP)
@@ -280,6 +293,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, int length) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ASCII_STREAM)
@@ -290,6 +304,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setUnicodeStream(int parameterIndex, InputStream x, int length) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(UNICODE_STREAM)
@@ -300,16 +315,19 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream inputStream, int length) throws SQLException {
+        this.checkClosed();
         this.setBinaryStream(parameterIndex, inputStream, (long) length);
     }
 
     @Override
     public void clearParameters() throws SQLException {
+        this.checkClosed();
         this.paramsMap = new TreeMap<>();
     }
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
@@ -320,6 +338,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setObject(int parameterIndex, Object x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
@@ -330,11 +349,25 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public boolean execute() throws SQLException {
-        throw new SQLException("Not supported.");
+        this.checkClosed();
+        String trimmedSql = sql.trim().toUpperCase();
+        if (trimmedSql.startsWith("SELECT")) {
+            // Delegate to executeQuery
+            ResultSet resultSet = this.executeQuery(sql);
+            // Store the ResultSet for later retrieval if needed
+            this.lastResultSet = resultSet;
+            this.lastUpdateCount = -1;
+            return true; // Indicates a ResultSet was returned
+        } else {
+            // Delegate to executeUpdate
+            this.lastUpdateCount = this.executeUpdate(sql);
+            return false; // Indicates no ResultSet was returned
+        }
     }
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, int length) throws SQLException {
+        this.checkClosed();
         //TODO this will require an implementation of Reader that communicates across GRPC
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
@@ -346,6 +379,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setRef(int parameterIndex, Ref x) throws SQLException {
+        this.checkClosed();
         if (DbInfo.isH2DB()) {
             throw new SQLException("Not supported.");
         }
@@ -359,6 +393,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, Blob x) throws SQLException {
+        this.checkClosed();
         String blobUUID = (x != null) ? ((org.openjdbcproxy.jdbc.Blob) x).getUUID() : null;
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
@@ -370,6 +405,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setClob(int parameterIndex, Clob x) throws SQLException {
+        this.checkClosed();
         String clobUUID = (x != null) ? ((org.openjdbcproxy.jdbc.Clob) x).getUUID() : null;
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
@@ -381,6 +417,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setArray(int parameterIndex, Array x) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ARRAY)
@@ -391,11 +428,13 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public ResultSetMetaData getMetaData() throws SQLException {
+        this.checkClosed();
         return new org.openjdbcproxy.jdbc.ResultSetMetaData(this, this.statementService);
     }
 
     @Override
     public void setDate(int parameterIndex, Date x, Calendar cal) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(DATE)
@@ -406,6 +445,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setTime(int parameterIndex, Time x, Calendar cal) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIME)
@@ -416,6 +456,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setTimestamp(int parameterIndex, Timestamp x, Calendar cal) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(TIMESTAMP)
@@ -426,6 +467,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNull(int parameterIndex, int sqlType, String typeName) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(NULL)
@@ -436,6 +478,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setURL(int parameterIndex, URL x) throws SQLException {
+        this.checkClosed();
         if (DbInfo.isH2DB()) {
             throw new SQLException("Not supported.");
         }
@@ -449,11 +492,13 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public ParameterMetaData getParameterMetaData() throws SQLException {
+        this.checkClosed();
         return new org.openjdbcproxy.jdbc.ParameterMetaData();
     }
 
     @Override
     public void setRowId(int parameterIndex, RowId x) throws SQLException {
+        this.checkClosed();
         if (DbInfo.isH2DB()) {
             throw new SQLException("Not supported.");
         }
@@ -467,6 +512,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNString(int parameterIndex, String value) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_STRING)
@@ -477,6 +523,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value, long length) throws SQLException {
+        this.checkClosed();
         //TODO see if can use similar/same reader communication layer as other methods that require reader
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
@@ -488,6 +535,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNClob(int parameterIndex, NClob value) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(N_CLOB)
@@ -498,6 +546,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setClob(int parameterIndex, Reader reader, long length) throws SQLException {
+        this.checkClosed();
         try {
             org.openjdbcproxy.jdbc.Clob clob = (org.openjdbcproxy.jdbc.Clob) this.getConnection().createClob();
             OutputStream os = clob.setAsciiStream(1);
@@ -523,6 +572,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBlob(int parameterIndex, InputStream inputStream, long length) throws SQLException {
+        this.checkClosed();
         try {
             org.openjdbcproxy.jdbc.Blob blob = (org.openjdbcproxy.jdbc.Blob) this.getConnection().createBlob();
             OutputStream os = blob.setBinaryStream(1);
@@ -548,6 +598,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNClob(int parameterIndex, Reader reader, long length) throws SQLException {
+        this.checkClosed();
         //TODO see if can use similar/same reader communication layer as other methods that require reader
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
@@ -559,6 +610,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setSQLXML(int parameterIndex, SQLXML xmlObject) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(SQL_XML)
@@ -569,6 +621,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setObject(int parameterIndex, Object x, int targetSqlType, int scaleOrLength) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(OBJECT)
@@ -579,6 +632,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x, long length) throws SQLException {
+        this.checkClosed();
         this.paramsMap.put(parameterIndex,
                 Parameter.builder()
                         .type(ASCII_STREAM)
@@ -589,6 +643,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream is, long length) throws SQLException {
+        this.checkClosed();
         try {
             BinaryStream binaryStream = new BinaryStream(this.getConnection(),
                     new LobServiceImpl(this.connection, this.statementService),
@@ -597,9 +652,9 @@ public class PreparedStatement implements java.sql.PreparedStatement {
             metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_INDEX, parameterIndex);
             metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_LENGTH, length);
             metadata.put(CommonConstants.PREPARED_STATEMENT_BINARY_STREAM_SQL, this.sql);
-            metadata.put(CommonConstants.PREPARED_STATEMENT_UUID_BINARY_STREAM, this.prepareStatementUUID);
+            metadata.put(CommonConstants.PREPARED_STATEMENT_UUID_BINARY_STREAM, this.getStatementUUID());
             LobReference lobReference = binaryStream.sendBinaryStream(LobType.LT_BINARY_STREAM, is, metadata);
-            this.prepareStatementUUID = lobReference.getUuid();//Lob reference UUID for binary streams is the prepared statement uuid.
+            this.setStatementUUID(lobReference.getUuid());//Lob reference UUID for binary streams is the prepared statement uuid.
         } catch (RuntimeException e) {
             throw new SQLException("Unable to write binary stream: " + e.getMessage(), e);
         }
@@ -607,30 +662,33 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader, long length) throws SQLException {
+        this.checkClosed();
     }
 
     @Override
     public void setAsciiStream(int parameterIndex, InputStream x) throws SQLException {
-
+        this.checkClosed();
     }
 
     @Override
     public void setBinaryStream(int parameterIndex, InputStream x) throws SQLException {
+        this.checkClosed();
         this.setBinaryStream(parameterIndex, x, -1); //-1 means not provided in OJP BynaryStrem server side
     }
 
     @Override
     public void setCharacterStream(int parameterIndex, Reader reader) throws SQLException {
-
+        this.checkClosed();
     }
 
     @Override
     public void setNCharacterStream(int parameterIndex, Reader value) throws SQLException {
-
+        this.checkClosed();
     }
 
     @Override
     public void setClob(int parameterIndex, Reader reader) throws SQLException {
+        this.checkClosed();
         this.setClob(parameterIndex, reader, Long.MAX_VALUE);
     }
 
@@ -641,238 +699,7 @@ public class PreparedStatement implements java.sql.PreparedStatement {
 
     @Override
     public void setNClob(int parameterIndex, Reader reader) throws SQLException {
-
-    }
-
-    // --- Statement interface methods (delegated to this.getStatement()) ---
-
-    @Override
-    public ResultSet executeQuery(String sql) throws SQLException {
-        return this.getStatement().executeQuery(sql);
-    }
-
-    @Override
-    public int executeUpdate(String sql) throws SQLException {
-        return this.getStatement().executeUpdate(sql);
-    }
-
-    @Override
-    public void close() throws SQLException {
-        this.getStatement().close();
-    }
-
-    @Override
-    public int getMaxFieldSize() throws SQLException {
-        return this.getStatement().getMaxFieldSize();
-    }
-
-    @Override
-    public void setMaxFieldSize(int max) throws SQLException {
-        this.getStatement().setMaxFieldSize(max);
-    }
-
-    @Override
-    public int getMaxRows() throws SQLException {
-        return this.getStatement().getMaxRows();
-    }
-
-    @Override
-    public void setMaxRows(int max) throws SQLException {
-        this.getStatement().setMaxRows(max);
-    }
-
-    @Override
-    public void setEscapeProcessing(boolean enable) throws SQLException {
-        this.getStatement().setEscapeProcessing(enable);
-    }
-
-    @Override
-    public int getQueryTimeout() throws SQLException {
-        return this.getStatement().getQueryTimeout();
-    }
-
-    @Override
-    public void setQueryTimeout(int seconds) throws SQLException {
-        this.getStatement().setQueryTimeout(seconds);
-    }
-
-    @Override
-    public void cancel() throws SQLException {
-        this.getStatement().cancel();
-    }
-
-    @Override
-    public SQLWarning getWarnings() throws SQLException {
-        return this.getStatement().getWarnings();
-    }
-
-    @Override
-    public void clearWarnings() throws SQLException {
-        this.getStatement().clearWarnings();
-    }
-
-    @Override
-    public void setCursorName(String name) throws SQLException {
-        this.getStatement().setCursorName(name);
-    }
-
-    @Override
-    public boolean execute(String sql) throws SQLException {
-        return this.getStatement().execute(sql);
-    }
-
-    @Override
-    public ResultSet getResultSet() throws SQLException {
-        return this.getStatement().getResultSet();
-    }
-
-    @Override
-    public int getUpdateCount() throws SQLException {
-        return this.getStatement().getUpdateCount();
-    }
-
-    @Override
-    public boolean getMoreResults() throws SQLException {
-        return this.getStatement().getMoreResults();
-    }
-
-    @Override
-    public void setFetchDirection(int direction) throws SQLException {
-        this.getStatement().setFetchDirection(direction);
-    }
-
-    @Override
-    public int getFetchDirection() throws SQLException {
-        return this.getStatement().getFetchDirection();
-    }
-
-    @Override
-    public void setFetchSize(int rows) throws SQLException {
-        this.getStatement().setFetchSize(rows);
-    }
-
-    @Override
-    public int getFetchSize() throws SQLException {
-        return this.getStatement().getFetchSize();
-    }
-
-    @Override
-    public int getResultSetConcurrency() throws SQLException {
-        return this.getStatement().getResultSetConcurrency();
-    }
-
-    @Override
-    public int getResultSetType() throws SQLException {
-        return this.getStatement().getResultSetType();
-    }
-
-    @Override
-    public void addBatch(String sql) throws SQLException {
-        this.getStatement().addBatch(sql);
-    }
-
-    @Override
-    public void clearBatch() throws SQLException {
-        this.getStatement().clearBatch();
-    }
-
-    @Override
-    public int[] executeBatch() throws SQLException {
-        return this.getStatement().executeBatch();
-    }
-
-    @Override
-    public Connection getConnection() throws SQLException {
-        return this.connection;
-    }
-
-    @Override
-    public boolean getMoreResults(int current) throws SQLException {
-        return this.getStatement().getMoreResults(current);
-    }
-
-    @Override
-    public RemoteProxyResultSet getGeneratedKeys() throws SQLException {
-        return this.getStatement().getGeneratedKeys();
-    }
-
-    @Override
-    public int executeUpdate(String sql, int autoGeneratedKeys) throws SQLException {
-        return this.getStatement().executeUpdate(sql, autoGeneratedKeys);
-    }
-
-    @Override
-    public int executeUpdate(String sql, int[] columnIndexes) throws SQLException {
-        return this.getStatement().executeUpdate(sql, columnIndexes);
-    }
-
-    @Override
-    public int executeUpdate(String sql, String[] columnNames) throws SQLException {
-        return this.getStatement().executeUpdate(sql, columnNames);
-    }
-
-    @Override
-    public boolean execute(String sql, int autoGeneratedKeys) throws SQLException {
-        return this.getStatement().execute(sql, autoGeneratedKeys);
-    }
-
-    @Override
-    public boolean execute(String sql, int[] columnIndexes) throws SQLException {
-        return this.getStatement().execute(sql, columnIndexes);
-    }
-
-    @Override
-    public boolean execute(String sql, String[] columnNames) throws SQLException {
-        return this.getStatement().execute(sql, columnNames);
-    }
-
-    @Override
-    public int getResultSetHoldability() throws SQLException {
-        return this.getStatement().getResultSetHoldability();
-    }
-
-    @Override
-    public boolean isClosed() throws SQLException {
-        return this.getStatement().isClosed();
-    }
-
-    @Override
-    public void setPoolable(boolean poolable) throws SQLException {
-        this.getStatement().setPoolable(poolable);
-    }
-
-    @Override
-    public boolean isPoolable() throws SQLException {
-        return this.getStatement().isPoolable();
-    }
-
-    @Override
-    public void closeOnCompletion() throws SQLException {
-        this.getStatement().closeOnCompletion();
-    }
-
-    @Override
-    public boolean isCloseOnCompletion() throws SQLException {
-        return this.getStatement().isCloseOnCompletion();
-    }
-
-    @Override
-    public <T> T unwrap(Class<T> iface) throws SQLException {
-        return null;
-    }
-
-    @Override
-    public boolean isWrapperFor(Class<?> iface) throws SQLException {
-        return false;
-    }
-
-    private synchronized Statement getStatement() throws SQLException {
-        if (this.statement == null) {
-            this.propertiesHaveSqlStatement();
-            this.statement = new Statement(this.connection, this.statementService, this.properties,
-                    ResourceType.RES_PREPARED_STATEMENT);
-        }
-        return this.statement;
+        this.checkClosed();
     }
 
     public Map<String, Object> getProperties() {
@@ -895,13 +722,13 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         }
     }
 
-    private CallResourceRequest.Builder newCallBuilder() {
+    private CallResourceRequest.Builder newCallBuilder() throws SQLException {
         this.propertiesHaveSqlStatement();
         CallResourceRequest.Builder builder = CallResourceRequest.newBuilder()
                 .setSession(this.connection.getSession())
                 .setResourceType(ResourceType.RES_PREPARED_STATEMENT);
-        if (this.prepareStatementUUID != null) {
-            builder.setResourceUUID(this.prepareStatementUUID);
+        if (this.getStatementUUID() != null) {
+            builder.setResourceUUID(this.getStatementUUID());
         }
         if (this.properties != null) {
             builder.setProperties(ByteString.copyFrom(serialize(this.properties)));
@@ -924,8 +751,8 @@ public class PreparedStatement implements java.sql.PreparedStatement {
         );
         CallResourceResponse response = this.statementService.callResource(reqBuilder.build());
         this.connection.setSession(response.getSession());
-        if (this.prepareStatementUUID == null && !response.getResourceUUID().isBlank()) {
-            this.prepareStatementUUID = response.getResourceUUID();
+        if (this.getStatementUUID() == null && !response.getResourceUUID().isBlank()) {
+            this.setStatementUUID(response.getResourceUUID());
         }
         if (Void.class.equals(returnType)) {
             return null;

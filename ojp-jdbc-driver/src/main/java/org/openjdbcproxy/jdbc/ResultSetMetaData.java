@@ -53,8 +53,8 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData {
                     .setSession(this.ps.getConnection().getSession())
                     .setResourceType(ResourceType.RES_PREPARED_STATEMENT)
                     .setProperties(ByteString.copyFrom(serialize(this.ps.getProperties())));
-            if (StringUtils.isNotBlank(this.ps.getPrepareStatementUUID())) {
-                    builder.setResourceUUID(this.ps.getPrepareStatementUUID());
+            if (StringUtils.isNotBlank(this.ps.getStatementUUID())) {
+                    builder.setResourceUUID(this.ps.getStatementUUID());
             }
             return builder;
         }

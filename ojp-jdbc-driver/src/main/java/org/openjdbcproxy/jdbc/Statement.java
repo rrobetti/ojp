@@ -7,6 +7,7 @@ import com.openjdbcproxy.grpc.CallType;
 import com.openjdbcproxy.grpc.OpResult;
 import com.openjdbcproxy.grpc.ResourceType;
 import com.openjdbcproxy.grpc.TargetCall;
+import lombok.Getter;
 import lombok.Setter;
 import org.openjdbcproxy.grpc.client.StatementService;
 
@@ -27,13 +28,15 @@ public class Statement implements java.sql.Statement {
     private final Connection connection;
     private final StatementService statementService;
     private final Map<String, Object> properties;
-    private ResultSet lastResultSet;
-    private int lastUpdateCount;
-    private boolean closed;
     @Setter
+    @Getter
     private String statementUUID;
     private int maxRows;
     private ResourceType resourceType;
+
+    protected boolean closed;
+    protected ResultSet lastResultSet;
+    protected int lastUpdateCount;
 
     public Statement(Connection connection, StatementService statementService) {
         this(connection, statementService, null);
@@ -52,7 +55,7 @@ public class Statement implements java.sql.Statement {
         this.closed = false;
     }
 
-    private void checkClosed() throws SQLException {
+    protected void checkClosed() throws SQLException {
         if (this.closed) {
             throw new SQLException("Statement is closed.");
         }
@@ -78,7 +81,9 @@ public class Statement implements java.sql.Statement {
     @Override
     public void close() throws SQLException {
         this.closed = true;
-        this.callProxy(CallType.CALL_CLOSE, "", Void.class);
+        if (this.getStatementUUID() != null) {
+            this.callProxy(CallType.CALL_CLOSE, "", Void.class);
+        }
     }
 
     @Override
