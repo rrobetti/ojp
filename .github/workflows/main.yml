@@ -1,0 +1,53 @@
+# This workflow builds and tests the project on pushes and pull requests to the main branch.
+# It uses a Postgres service for integration tests and skips the CI if the commit message contains '[skip ci]'.
+# The workflow result is reported in the Actions tab of the repository.
+name: Main CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: defaultdb
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Git checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 22
+        uses: actions/setup-java@v4
+        with:
+          java-version: 22
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build
+        run: mvn clean install -DskipTests
+
+      - name: Run ojp-server
+        run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
+
+      - name: Run tests
+        run: mvn test
