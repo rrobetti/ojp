@@ -71,25 +71,34 @@ The ojp-grpc-commons module contains the shared gRPC contracts used between the 
 
 ## How to build & test
 
-### Build modules
+From the root of the project, follow these 3 steps to build and test the project:
+
+### 1. Build modules
 
 ``mvn clean install -DskipTests``
 
-### Run ojp-server
+### 2. Run ojp-server
+
+This step is required to run tests.
 
 ``mvn verify -pl ojp-server -Prun-ojp-server``
 
-### Run tests
+### 3. Run tests
 Connections configuration: There are csv files under test/resources with connection details defaulted to H2 database, the name of each file implies which database connections can be added to it, for example the file h2_postgres_connections.csv can contain connections to H2 and/or postgres databases, integration tests classes that relly on this file will run all their tests against each connection in the file.
 
+Refer to the [run-local-databases.md](documents/environment-setup/run-local-databases.md) for more details on how to start local databases for testing.
+
 ``mvn test``
+
+Optional flags:
+- `-DdisablePostgresTests` to skip integration test that require a Postgres database.
 
 ## Partners
 <a href=https://www.linkedin.com/in/devsjava/>
 <img width="150px" height="150px" src="documents/images/comunidade_brasil_jug.jpeg" alt="Comunidade Brasil JUG" />
 </a>
-<a href=https://github.com/switcherapi/switcher-api>
-<img width="180px" height="120px" src="documents/images/switcherapi_grey.png" alt="Comunidade Brasil JUG" />
+<a href=https://github.com/switcherapi>
+<img width="180px" src="documents/images/switcherapi_grey.png" alt="Comunidade Brasil JUG" />
 </a>
 
 ## Feature implementation status

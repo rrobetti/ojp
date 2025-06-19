@@ -1,3 +1,6 @@
+# This workflow builds and tests the project on pushes and pull requests to the main branch.
+# It uses a Postgres service for integration tests and skips the CI if the commit message contains '[skip ci]'.
+# The workflow result is reported in the Actions tab of the repository.
 name: Main CI
 
 on:
