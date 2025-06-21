@@ -17,9 +17,11 @@ import static org.openjdbcproxy.jdbc.Constants.USER;
 
 public class Driver implements java.sql.Driver {
 
+    private static final StatementServiceGrpcClient grpcStub = new StatementServiceGrpcClient();
+
     static {
         try {
-            DriverManager.registerDriver(new Driver(new StatementServiceGrpcClient()));
+            DriverManager.registerDriver(new Driver());
         } catch (SQLException var1) {
             throw new RuntimeException("Can't register driver!");
         }
@@ -27,8 +29,8 @@ public class Driver implements java.sql.Driver {
 
     private final StatementService statementService;
 
-    public Driver(StatementService statementService) {
-        this.statementService = statementService;
+    public Driver() {
+        this.statementService = grpcStub;
     }
 
     @Override
@@ -54,7 +56,7 @@ public class Driver implements java.sql.Driver {
     public boolean acceptsURL(String url) throws SQLException {
         if (url == null) {
             throw new SQLException("URL is null");
-        } else if (url.startsWith("jdbc:ojp_")) {
+        } else if (url.contains("jdbc:ojp")) {
             return true;
         } else {
             return false;

@@ -126,7 +126,12 @@ public class ResultSet extends RemoteProxyResultSet {
 
     @Override
     public int getInt(int columnIndex) throws SQLException {
-        return (int) currentDataBlock.get(blockIdx.get())[columnIndex - 1];
+        Object value = currentDataBlock.get(blockIdx.get())[columnIndex - 1];
+        if (value instanceof Long lValue) {
+            return lValue.intValue();
+        } else {
+            return (int) value;
+        }
     }
 
     @Override
@@ -136,12 +141,20 @@ public class ResultSet extends RemoteProxyResultSet {
 
     @Override
     public float getFloat(int columnIndex) throws SQLException {
-        return (float) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        Object value = currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        if (value instanceof BigDecimal bdValue) {
+            return bdValue.floatValue();
+        }
+        return (float) value;
     }
 
     @Override
     public double getDouble(int columnIndex) throws SQLException {
-        return (double) currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        Object value = currentDataBlock.get(blockIdx.get())[columnIndex -1];
+        if (value instanceof BigDecimal bdValue) {
+            return bdValue.doubleValue();
+        }
+        return (double) value;
     }
 
     @Override
@@ -217,22 +230,22 @@ public class ResultSet extends RemoteProxyResultSet {
 
     @Override
     public int getInt(String columnLabel) throws SQLException {
-        return (int) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return this.getInt(this.labelsMap.get(columnLabel.toUpperCase()) + 1);
     }
 
     @Override
     public long getLong(String columnLabel) throws SQLException {
-        return (long) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return this.getLong(this.labelsMap.get(columnLabel.toUpperCase()) + 1);
     }
 
     @Override
     public float getFloat(String columnLabel) throws SQLException {
-        return (float) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return this.getFloat(this.labelsMap.get(columnLabel.toUpperCase()) + 1);
     }
 
     @Override
     public double getDouble(String columnLabel) throws SQLException {
-        return (double) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
+        return this.getDouble(this.labelsMap.get(columnLabel.toUpperCase()));
     }
 
     @Override
