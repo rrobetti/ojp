@@ -11,9 +11,12 @@ on:
 
 jobs:
   build-test:
-    name: Build & Test
+    name: Build & Test Server
     runs-on: ubuntu-latest
     if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
+    strategy:
+      matrix:
+        java-version: [ 11, 17, 21, 22 ]
 
     services:
       postgres:
@@ -36,18 +39,34 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 22
+      - name: Set up JDK 22 for ojp-server
         uses: actions/setup-java@v4
         with:
           java-version: 22
           distribution: 'temurin'
           cache: maven
 
-      - name: Build
+      - name: Build (ojp-server)
         run: mvn clean install -DskipTests
 
-      - name: Run ojp-server
+      - name: Test (ojp-server)
+        run: mvn test -pl ojp-server
+
+      - name: Run (ojp-server)
         run: mvn verify -pl ojp-server -Prun-ojp-server > ojp-server.log 2>&1 &
 
-      - name: Run tests
-        run: mvn test
+      - name: Wait for ojp-server to start
+        run: sleep 10
+
+      - name: Set up JDK ${{ matrix.java-version }} for ojp-grpc-commons and ojp-jdbc-driver
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build (ojp-grpc-commons, ojp-jdbc-driver)
+        run: mvn clean install -pl ojp-grpc-commons,ojp-jdbc-driver -DskipTests
+
+      - name: Test (ojp-grpc-commons, ojp-jdbc-driver)
+        run: mvn test -pl ojp-grpc-commons,ojp-jdbc-driver
