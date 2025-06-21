@@ -37,28 +37,22 @@ public class BinaryStreamIntegrationTest {
         System.out.println("Testing for url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table_blob
-                            """);
+            executeUpdate(conn, "drop table test_table_blob");
         } catch (Exception e) {
             //If fails disregard as per the table is most possibly not created yet
         }
 
         executeUpdate(conn,
-                """
-                        create table test_table_blob(
-                                 val_blob1 BYTEA,
-                                 val_blob2 BYTEA
-                        )
-                        """);
+                "create table test_table_blob(" +
+                        " val_blob1 BYTEA," +
+                        " val_blob2 BYTEA" +
+                        ")"
+        );
 
         conn.setAutoCommit(false);
 
         PreparedStatement psInsert = conn.prepareStatement(
-                """
-                        insert into test_table_blob (val_blob1, val_blob2) values (?, ?)
-                        """
+                "insert into test_table_blob (val_blob1, val_blob2) values (?, ?)"
         );
 
         String testString = "BLOB VIA INPUT STREAM";
@@ -87,10 +81,7 @@ public class BinaryStreamIntegrationTest {
         String fromBlobByIdx2 = new String(blobResult2.readAllBytes());
         Assert.assertEquals(testString.substring(0, 5), fromBlobByIdx2);
 
-        executeUpdate(conn,
-                """
-                        delete from test_table_blob
-                        """
+        executeUpdate(conn, "delete from test_table_blob"
         );
 
         resultSet.close();
@@ -109,25 +100,19 @@ public class BinaryStreamIntegrationTest {
         System.out.println("Testing for url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table_blob
-                            """);
+            executeUpdate(conn, "drop table test_table_blob");
         } catch (Exception e) {
             //If fails disregard as per the table is most possibly not created yet
         }
 
         executeUpdate(conn,
-                """
-                        create table test_table_blob(
-                                 val_blob  BYTEA
-                        )
-                        """);
+                "create table test_table_blob(" +
+                        " val_blob  BYTEA" +
+                        ")"
+        );
 
         PreparedStatement psInsert = conn.prepareStatement(
-                """
-                        insert into test_table_blob (val_blob) values (?)
-                        """
+                "insert into test_table_blob (val_blob) values (?)"
         );
 
 
@@ -152,11 +137,7 @@ public class BinaryStreamIntegrationTest {
             byteFile = inputStreamTestFile.read();
         }
 
-        executeUpdate(conn,
-                """
-                        delete from test_table_blob
-                        """
-        );
+        executeUpdate(conn, "delete from test_table_blob");
 
         resultSet.close();
         psSelect.close();
