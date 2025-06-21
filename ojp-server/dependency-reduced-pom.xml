@@ -29,21 +29,23 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>com.jolira</groupId>
-        <artifactId>onejar-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>one-jar</goal>
-            </goals>
-            <configuration>
-              <mainClass>org.baeldung.executable.
-                                ExecutableMavenJar</mainClass>
-              <attachToBuild>true</attachToBuild>
-              <filename>${project.build.finalName}.${project.packaging}</filename>
-            </configuration>
-          </execution>
-        </executions>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>${jib.plugin.version}</version>
+        <configuration>
+          <from>
+            <image>eclipse-temurin:22-jre</image>
+          </from>
+          <to>
+            <image>rrobetti/ojp:0.0.1-alpha</image>
+          </to>
+          <container>
+            <mainClass>org.openjdbcproxy.grpc.server.GrpcServer</mainClass>
+            <ports>
+              <port>1059</port>
+            </ports>
+          </container>
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -56,7 +58,10 @@
     </dependency>
   </dependencies>
   <properties>
+    <maven.compiler.target>22</maven.compiler.target>
     <slf4j.version>2.0.17</slf4j.version>
+    <jib.plugin.version>3.4.5</jib.plugin.version>
+    <maven.compiler.source>22</maven.compiler.source>
     <grpc.version>1.70.0</grpc.version>
   </properties>
 </project>
