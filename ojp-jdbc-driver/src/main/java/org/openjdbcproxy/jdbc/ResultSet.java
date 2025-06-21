@@ -127,7 +127,8 @@ public class ResultSet extends RemoteProxyResultSet {
     @Override
     public int getInt(int columnIndex) throws SQLException {
         Object value = currentDataBlock.get(blockIdx.get())[columnIndex - 1];
-        if (value instanceof Long lValue) {
+        if (value instanceof Long) {
+            Long lValue = (Long) value;
             return lValue.intValue();
         } else {
             return (int) value;
@@ -142,7 +143,8 @@ public class ResultSet extends RemoteProxyResultSet {
     @Override
     public float getFloat(int columnIndex) throws SQLException {
         Object value = currentDataBlock.get(blockIdx.get())[columnIndex -1];
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.floatValue();
         }
         return (float) value;
@@ -151,7 +153,8 @@ public class ResultSet extends RemoteProxyResultSet {
     @Override
     public double getDouble(int columnIndex) throws SQLException {
         Object value = currentDataBlock.get(blockIdx.get())[columnIndex -1];
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.doubleValue();
         }
         return (double) value;

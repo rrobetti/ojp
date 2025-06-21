@@ -36,7 +36,6 @@ jobs:
           DOCKERHUB_REPO: ${{ vars.DOCKERHUB_REPO }}
         run: |
           mvn compile jib:build -pl ojp-server \
-            -Dimage="${DOCKERHUB_REPO}:latest" \
             -Djib.to.auth.username="${DOCKERHUB_USER}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}" \
             -Djib.to.image="${DOCKERHUB_REPO}/ojp:latest" \
