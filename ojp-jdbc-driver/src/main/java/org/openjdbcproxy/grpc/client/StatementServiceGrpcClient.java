@@ -42,12 +42,15 @@ import static org.openjdbcproxy.grpc.client.GrpcExceptionHandler.handle;
 public class StatementServiceGrpcClient implements StatementService {
 
     private static final String DEFAULT_HOST = "localhost";
+    private static final String DNS_PREFIX = "dns:///";
+    private static final String COLON = ":";
     private final Pattern pattern = Pattern.compile(CommonConstants.OJP_REGEX_PATTERN);
 
     private StatementServiceGrpc.StatementServiceBlockingStub statemetServiceBlockingStub;
     private StatementServiceGrpc.StatementServiceStub statemetServiceStub;
 
-    public StatementServiceGrpcClient() {}
+    public StatementServiceGrpcClient() {
+    }
 
     @Override
     public SessionInfo connect(ConnectionDetails connectionDetails) throws SQLException {
@@ -75,7 +78,8 @@ public class StatementServiceGrpcClient implements StatementService {
             }
 
             //Once channel is open it remains open and is shared among all requests.
-            ManagedChannel channel = ManagedChannelBuilder.forAddress(host, port)
+            String target = DNS_PREFIX + host + COLON + port;
+            ManagedChannel channel = ManagedChannelBuilder.forTarget(target)
                     .usePlaintext()
                     .build();
 
@@ -95,7 +99,7 @@ public class StatementServiceGrpcClient implements StatementService {
                                   Map<String, Object> properties)
             throws SQLException {
         try {
-            StatementRequest.Builder builder =  StatementRequest.newBuilder();
+            StatementRequest.Builder builder = StatementRequest.newBuilder();
             if (properties != null) {
                 builder.setProperties(ByteString.copyFrom(serialize(properties)));
             }
@@ -120,7 +124,7 @@ public class StatementServiceGrpcClient implements StatementService {
     public Iterator<OpResult> executeQuery(SessionInfo sessionInfo, String sql, List<Parameter> params, String statementUUID,
                                            Map<String, Object> properties) throws SQLException {
         try {
-            StatementRequest.Builder builder =  StatementRequest.newBuilder();
+            StatementRequest.Builder builder = StatementRequest.newBuilder();
             if (properties != null) {
                 builder.setProperties(ByteString.copyFrom(serialize(properties)));
             }
@@ -200,8 +204,9 @@ public class StatementServiceGrpcClient implements StatementService {
 
                         @Override
                         public void onError(Throwable throwable) {
-                            if (throwable instanceof StatusRuntimeException sre) {
+                            if (throwable instanceof StatusRuntimeException) {
                                 try {
+                                    StatusRuntimeException sre = (StatusRuntimeException) throwable;
                                     handle(sre);//To convert to SQLException if possible
                                     sfFirstLobReference.setException(sre);
                                     sfFinalLobReference.setException(sre); //When conversion to SQLException not possible
@@ -330,8 +335,8 @@ public class StatementServiceGrpcClient implements StatementService {
 
             //Wait to receive at least one successful block before returning.
             if (!sfFirstBlockReceived.get() && errorReceived[0] != null) {
-                if (errorReceived[0] instanceof Exception e) {
-                    throw e;
+                if (errorReceived[0] instanceof Exception) {
+                    throw (Exception) errorReceived[0];
                 } else {
                     throw new RuntimeException(errorReceived[0]);
                 }
@@ -397,9 +402,9 @@ public class StatementServiceGrpcClient implements StatementService {
             @Override
             public void onError(Throwable throwable) {
                 Throwable t = throwable;
-                if (throwable instanceof StatusRuntimeException sre) {
+                if (throwable instanceof StatusRuntimeException) {
                     try {
-                        handle(sre);
+                        handle((StatusRuntimeException) throwable);
                     } catch (SQLException e) {
                         t = e;
                     }

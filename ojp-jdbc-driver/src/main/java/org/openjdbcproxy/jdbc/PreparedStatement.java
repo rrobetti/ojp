@@ -32,10 +32,12 @@ import java.sql.Ref;
 import java.sql.ResultSetMetaData;
 import java.sql.RowId;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -106,7 +108,7 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
     public ResultSet executeQuery() throws SQLException {
         this.checkClosed();
         Iterator<OpResult> itOpResult = this.statementService
-                .executeQuery(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList(), this.properties);
+                .executeQuery(this.connection.getSession(), this.sql, new ArrayList<>(this.paramsMap.values()), this.properties);
         return new ResultSet(itOpResult, this.statementService, this);
     }
 
@@ -115,7 +117,7 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
         this.checkClosed();
         log.info("Executing update for -> {}", this.sql);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
-                this.paramsMap.values().stream().toList(), this.getStatementUUID(), null);
+                new ArrayList<>(this.paramsMap.values()), this.getStatementUUID(), null);
         this.connection.setSession(result.getSession());
         return deserialize(result.getValue().toByteArray(), Integer.class);
     }
@@ -127,10 +129,10 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
         Map<String, Object> properties = new HashMap<>();
         properties.put(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG, Boolean.TRUE);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
-                this.paramsMap.values().stream().toList(), this.getStatementUUID(), properties);
+                new ArrayList<>(this.paramsMap.values()), this.getStatementUUID(), properties);
         this.connection.setSession(result.getSession());
         if (StringUtils.isBlank(this.getStatementUUID()) && ResultType.UUID_STRING.equals(result.getType()) &&
-                !result.getValue().isEmpty()) {
+            !result.getValue().isEmpty()) {
             String psUUID = deserialize(result.getValue().toByteArray(), String.class);
             this.setStatementUUID(psUUID);
         }
@@ -352,14 +354,14 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
         String trimmedSql = sql.trim().toUpperCase();
         if (trimmedSql.startsWith("SELECT")) {
             // Delegate to executeQuery
-            ResultSet resultSet = this.executeQuery();
+            ResultSet resultSet = this.executeQuery(sql);
             // Store the ResultSet for later retrieval if needed
             this.lastResultSet = resultSet;
             this.lastUpdateCount = -1;
             return true; // Indicates a ResultSet was returned
         } else {
             // Delegate to executeUpdate
-            this.lastUpdateCount = this.executeUpdate();
+            this.lastUpdateCount = this.executeUpdate(sql);
             return false; // Indicates no ResultSet was returned
         }
     }
@@ -750,7 +752,7 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
         );
         CallResourceResponse response = this.statementService.callResource(reqBuilder.build());
         this.connection.setSession(response.getSession());
-        if (this.getStatementUUID() == null && !response.getResourceUUID().isBlank()) {
+        if (this.getStatementUUID() == null && StringUtils.isNotBlank(response.getResourceUUID())) {
             this.setStatementUUID(response.getResourceUUID());
         }
         if (Void.class.equals(returnType)) {

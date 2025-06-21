@@ -17,8 +17,6 @@ import static org.openjdbcproxy.jdbc.Constants.USER;
 
 public class Driver implements java.sql.Driver {
 
-    private static final StatementServiceGrpcClient grpcStub = new StatementServiceGrpcClient();
-
     static {
         try {
             DriverManager.registerDriver(new Driver());
@@ -27,10 +25,16 @@ public class Driver implements java.sql.Driver {
         }
     }
 
-    private final StatementService statementService;
+    private static StatementService statementService;
 
     public Driver() {
-        this.statementService = grpcStub;
+        if (statementService == null) {
+            synchronized (Driver.class) {
+                if (statementService == null) {
+                    statementService = new StatementServiceGrpcClient();
+                }
+            }
+        }
     }
 
     @Override
@@ -40,7 +44,7 @@ public class Driver implements java.sql.Driver {
         } else {
             DbInfo.setH2DB(false);
         }
-        SessionInfo sessionInfo = this.statementService
+        SessionInfo sessionInfo = statementService
                 .connect(ConnectionDetails.newBuilder()
                         .setUrl(url)
                         .setUser((String) ((info.get(USER) != null)? info.get(USER) : ""))
@@ -49,18 +53,14 @@ public class Driver implements java.sql.Driver {
                         .build()
                 );
         //TODO create centralized handling of exceptions returned that coverts automatically to SQLException.
-        return new Connection(sessionInfo, this.statementService);
+        return new Connection(sessionInfo, statementService);
     }
 
     @Override
     public boolean acceptsURL(String url) throws SQLException {
         if (url == null) {
             throw new SQLException("URL is null");
-        } else if (url.contains("jdbc:ojp")) {
-            return true;
-        } else {
-            return false;
-        }
+        } else return url.startsWith("jdbc:ojp");
     }
 
     @Override
