@@ -21,19 +21,15 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
         System.out.println("Testing retrieving " + totalRecords + " records from url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table_multi
-                            """);
+            executeUpdate(conn, "drop table test_table_multi");
         } catch (Exception e) {
             //Does not matter
         }
         executeUpdate(conn,
-                """
-                create table test_table_multi(
-                         id INT NOT NULL,
-                           title VARCHAR(50) NOT NULL)
-                """);
+                "create table test_table_multi(" +
+                        "id INT NOT NULL, " +
+                        "title VARCHAR(50) NOT NULL)"
+        );
 
         for (int i = 0; i < totalRecords; i++) { //TODO make this test parameterized with multiple parameters
             executeUpdate(conn,
@@ -52,11 +48,7 @@ public class ReadMultipleBlocksOfDataIntegrationTest {
             Assert.assertEquals("TITLE_" + i, title);
         }
 
-        executeUpdate(conn,
-                """
-                    delete from test_table_multi
-                    """
-        );
+        executeUpdate(conn, "delete from test_table_multi");
 
         ResultSet resultSetAfterDeletion = psSelect.executeQuery();
         Assert.assertFalse(resultSetAfterDeletion.next());

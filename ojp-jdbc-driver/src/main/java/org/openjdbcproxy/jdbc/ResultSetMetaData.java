@@ -35,7 +35,8 @@ public class ResultSetMetaData implements java.sql.ResultSetMetaData {
 
     @Override
     public int getColumnCount() throws SQLException {
-        if (resultSet instanceof org.openjdbcproxy.jdbc.ResultSet rs) {
+        if (resultSet instanceof org.openjdbcproxy.jdbc.ResultSet) {
+            org.openjdbcproxy.jdbc.ResultSet rs = (org.openjdbcproxy.jdbc.ResultSet) resultSet;
             return rs.getLabelsMap().size();
         } else {
             return this.retrieveMetadataAttribute(CallType.CALL_GET, "ColumnCount",-1, Integer.class);
