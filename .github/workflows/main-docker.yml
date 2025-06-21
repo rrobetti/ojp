@@ -39,6 +39,6 @@ jobs:
             -Dimage="${DOCKERHUB_REPO}:latest" \
             -Djib.to.auth.username="${DOCKERHUB_USER}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}" \
-            -Djib.to.image="${DOCKERHUB_REPO}:latest" \
+            -Djib.to.image="${DOCKERHUB_REPO}/ojp:latest" \
             -Djib.container.mainClass="org.openjdbcproxy.grpc.server.GrpcServer" \
             -Djib.container.ports=1059
