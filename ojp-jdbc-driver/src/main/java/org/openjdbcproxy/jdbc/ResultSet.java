@@ -129,7 +129,8 @@ public class ResultSet extends RemoteProxyResultSet {
         try {
             return (int) currentDataBlock.get(blockIdx.get())[columnIndex - 1];
         } catch (ClassCastException e) {
-            if (currentDataBlock.get(blockIdx.get())[columnIndex - 1] instanceof Long longValue) {
+            if (currentDataBlock.get(blockIdx.get())[columnIndex - 1] instanceof Long) {
+                Long longValue = (Long) currentDataBlock.get(blockIdx.get())[columnIndex - 1];
                 if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
                     return longValue.intValue();
                 } else {
@@ -231,7 +232,8 @@ public class ResultSet extends RemoteProxyResultSet {
         try {
             return (int) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
         }catch (ClassCastException e) {
-            if (currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())] instanceof Long longValue) {
+            if (currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())] instanceof Long) {
+                Long longValue = (Long) currentDataBlock.get(blockIdx.get())[this.labelsMap.get(columnLabel.toUpperCase())];
                 if (longValue >= Integer.MIN_VALUE && longValue <= Integer.MAX_VALUE) {
                     return longValue.intValue();
                 } else {
