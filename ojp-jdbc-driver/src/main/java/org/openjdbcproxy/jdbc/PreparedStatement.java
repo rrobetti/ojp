@@ -350,17 +350,17 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
     @Override
     public boolean execute() throws SQLException {
         this.checkClosed();
-        String trimmedSql = sql.trim().toUpperCase();
+        String trimmedSql = this.sql.trim().toUpperCase();
         if (trimmedSql.startsWith("SELECT")) {
             // Delegate to executeQuery
-            ResultSet resultSet = this.executeQuery(sql);
+            ResultSet resultSet = this.executeQuery();
             // Store the ResultSet for later retrieval if needed
             this.lastResultSet = resultSet;
             this.lastUpdateCount = -1;
             return true; // Indicates a ResultSet was returned
         } else {
             // Delegate to executeUpdate
-            this.lastUpdateCount = this.executeUpdate(sql);
+            this.lastUpdateCount = this.executeUpdate();
             return false; // Indicates no ResultSet was returned
         }
     }
