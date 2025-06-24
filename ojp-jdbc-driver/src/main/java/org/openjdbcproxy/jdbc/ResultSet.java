@@ -245,7 +245,7 @@ public class ResultSet extends RemoteProxyResultSet {
 
     @Override
     public double getDouble(String columnLabel) throws SQLException {
-        return this.getDouble(this.labelsMap.get(columnLabel.toUpperCase()));
+        return this.getDouble(this.labelsMap.get(columnLabel.toUpperCase()) + 1);
     }
 
     @Override

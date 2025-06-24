@@ -47,13 +47,11 @@ public class Connection implements java.sql.Connection {
     private final StatementService statementService;
     private boolean autoCommit = true;
     private boolean readOnly = false;
-    private SessionTerminationTrigger sessionTerminationTrigger;
     private boolean closed;
 
     public Connection(SessionInfo session, StatementService statementService) {
         this.session = session;
         this.statementService = statementService;
-        this.sessionTerminationTrigger = new SessionTerminationTrigger();
         this.closed = false;
     }
 
@@ -87,12 +85,6 @@ public class Connection implements java.sql.Connection {
             //If switching autocommit off, start a new transaction
         } else if (this.autoCommit && !autoCommit) {
             this.session = this.statementService.startTransaction(this.session);
-        }
-
-        if (!this.autoCommit && autoCommit) {
-            if (this.sessionTerminationTrigger.triggerIssued(true, null, null)) {
-                this.close();
-            }
         }
 
         this.autoCommit = autoCommit;
@@ -148,12 +140,6 @@ public class Connection implements java.sql.Connection {
         if (!DbInfo.isH2DB()) {
             this.readOnly = readOnly;
         }
-
-        if (readOnly) {
-            if (this.sessionTerminationTrigger.triggerIssued(null, true, null)) {
-                this.close();
-            }
-        }
     }
 
     @Override
@@ -187,11 +173,7 @@ public class Connection implements java.sql.Connection {
     }
 
     @Override
-    public void clearWarnings() throws SQLException {
-        if (this.sessionTerminationTrigger.triggerIssued(null, null, true)) {
-            this.close();
-        }
-    }
+    public void clearWarnings() throws SQLException {}
 
     @Override
     public java.sql.Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {

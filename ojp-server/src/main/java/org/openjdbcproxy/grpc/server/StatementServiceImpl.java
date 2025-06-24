@@ -82,6 +82,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     //TODO put the datasource at database level not user + database so if more than one user agaist the DB still maintain the max pool size
     private final Map<String, HikariDataSource> datasourceMap = new ConcurrentHashMap<>();
     private final SessionManager sessionManager;
+    private final CircuitBreaker circuitBreaker;
 
     static {
         //TODO register all JDBC drivers supported here.
@@ -128,6 +129,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void executeUpdate(StatementRequest request, StreamObserver<OpResult> responseObserver) {
         log.info("Executing update {}", request.getSql());
+        String stmtHash = SqlStatementXXHash.hashSqlQuery(request.getSql());
         int updated = 0;
         SessionInfo returnSessionInfo = request.getSession();
         ConnectionSessionDTO dto = ConnectionSessionDTO.builder().build();
@@ -186,7 +188,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         .setValue(ByteString.copyFrom(serialize(updated))).build());
             }
             responseObserver.onCompleted();
+            circuitBreaker.onSuccess(stmtHash);
         } catch (SQLException e) {// Need a second catch just for the acquisition of the connection
+            circuitBreaker.onFailure(stmtHash, e);
             log.error("Failure during update execution: " + e.getMessage(), e);
             sendSQLExceptionMetadata(e, responseObserver);
         } finally {
@@ -294,7 +298,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void executeQuery(StatementRequest request, StreamObserver<OpResult> responseObserver) {
         log.info("Executing query for {}", request.getSql());
+        String stmtHash = SqlStatementXXHash.hashSqlQuery(request.getSql());
         try {
+            circuitBreaker.preCheck(stmtHash);
             ConnectionSessionDTO dto = this.sessionConnection(request.getSession(), true);
 
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
@@ -308,8 +314,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         stmt.executeQuery(request.getSql()));
                 this.handleResultSet(dto.getSession(), resultSetUUID, responseObserver);
             }
-
+            circuitBreaker.onSuccess(stmtHash);
         } catch (SQLException e) {
+            circuitBreaker.onFailure(stmtHash, e);
             log.error("Failure during query execution: " + e.getMessage(), e);
             sendSQLExceptionMetadata(e, responseObserver);
         }
