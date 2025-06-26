@@ -155,13 +155,16 @@
                         <image>eclipse-temurin:22-jre</image>
                     </from>
                     <to>
-                        <image>rrobetti/ojp:0.0.1-alpha</image>
+                        <image>rrobetti/ojp:0.0.3-alpha</image>
                     </to>
                     <container>
                         <mainClass>org.openjdbcproxy.grpc.server.GrpcServer</mainClass>
                         <ports>
                             <port>1059</port>
                         </ports>
+                        <jvmFlags>
+                            <jvmFlag>-Dorg.slf4j.simpleLogger.defaultLogLevel=error</jvmFlag>
+                        </jvmFlags>
                     </container>
                 </configuration>
             </plugin>
