@@ -15,6 +15,9 @@
     </parent>
 
     <properties>
+        <maven.compiler.source>22</maven.compiler.source>
+        <maven.compiler.target>22</maven.compiler.target>
+
         <grpc.version>1.70.0</grpc.version>
         <slf4j.version>2.0.17</slf4j.version>
         <jib.plugin.version>3.4.5</jib.plugin.version>
@@ -61,7 +64,6 @@
             <version>6.2.1</version>
         </dependency>
 
-
         <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-collections4 -->
         <dependency>
             <groupId>org.apache.commons</groupId>
@@ -76,7 +78,6 @@
             <version>1.18.36</version>
             <scope>provided</scope>
         </dependency>
-
 
         <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-api -->
         <dependency>
