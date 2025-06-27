@@ -158,6 +158,7 @@ enum CallType {
     CALL_EXECUTE = 43;
     CALL_ADD = 44;
     CALL_ENQUOTE = 45;
+    CALL_REGISTER = 46;
 }
 
 message TargetCall {

@@ -31,7 +31,7 @@ public class PostgresMiniStressTest {
     private static AtomicInteger failedQueries = new AtomicInteger(0);
 
     @SneakyThrows
-    public void setUp(String driverClass, String url, String user, String password) throws SQLException {
+    public void setUp() throws SQLException {
         queryDurations = new ConcurrentLinkedQueue<>();
         totalQueries = new AtomicInteger(0);
         failedQueries = new AtomicInteger(0);
@@ -41,7 +41,7 @@ public class PostgresMiniStressTest {
     @ParameterizedTest
     @CsvFileSource(resources = "/postgres_connection.csv")
     public void testConnectionProperties(String driverClass, String url, String user, String password) throws SQLException {
-        this.setUp(driverClass, url, user, password);
+        this.setUp();
         // 1. Schema and seeding (not timed)
         try (Connection conn = getConnection(driverClass, url, user, password)) {
             Statement stmt = conn.createStatement();

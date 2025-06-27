@@ -35,6 +35,7 @@ import org.openjdbcproxy.grpc.dto.Parameter;
 
 import java.io.InputStream;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -212,33 +213,38 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             return false;
         }
         Map<String, Object> properties = deserialize(request.getProperties().toByteArray(), Map.class);
-        return (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
+        Boolean batchFlag = (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
+        return batchFlag != null && batchFlag;
     }
 
     private Statement createStatement(Connection connection, StatementRequest request) throws SQLException {
-        if (StringUtils.isNotEmpty(request.getStatementUUID())) {
-            return this.sessionManager.getStatement(request.getSession(), request.getStatementUUID());
-        }
-        if (request.getProperties().isEmpty()) {
-            return connection.createStatement();
-        }
-        Map<String, Object> properties = deserialize(request.getParameters().toByteArray(), Map.class);
+        try {
+            if (StringUtils.isNotEmpty(request.getStatementUUID())) {
+                return this.sessionManager.getStatement(request.getSession(), request.getStatementUUID());
+            }
+            if (request.getProperties().isEmpty()) {
+                return connection.createStatement();
+            }
+            Map<String, Object> properties = deserialize(request.getProperties().toByteArray(), Map.class);
 
-        if (properties.isEmpty()) {
-            return connection.createStatement();
+            if (properties.isEmpty()) {
+                return connection.createStatement();
+            }
+            if (properties.size() == 2) {
+                return connection.createStatement(
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
+            }
+            if (properties.size() == 3) {
+                return connection.createStatement(
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
+            }
+            throw new SQLException("Incorrect number of properties for creating a new statement.");
+        } catch (RuntimeException re) {
+            throw new SQLException("Unable to create statement: " + re.getMessage(), re);
         }
-        if (properties.size() == 2) {
-            return connection.createStatement(
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
-        }
-        if (properties.size() == 3) {
-            return connection.createStatement(
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
-        }
-        throw new SQLException("Incorrect number of properties for creating a new statement.");
     }
 
     private PreparedStatement createPreparedStatement(ConnectionSessionDTO dto, String sql, List<Parameter> params,
@@ -842,6 +848,13 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             responseObserver.onCompleted();
         } catch (SQLException se) {
             sendSQLExceptionMetadata(se, responseObserver);
+        } catch (InvocationTargetException e) {
+            if (e.getTargetException() instanceof SQLException sqlException) {
+                sendSQLExceptionMetadata(sqlException, responseObserver);
+            } else {
+                sendSQLExceptionMetadata(new SQLException("Unable to call resource: " + e.getTargetException().getMessage()),
+                        responseObserver);
+            }
         } catch (Exception e) {
             sendSQLExceptionMetadata(new SQLException("Unable to call resource: " + e.getMessage()), responseObserver);
         }
@@ -934,6 +947,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case CALL_EXECUTE -> "execute";
             case CALL_ADD -> "add";
             case CALL_ENQUOTE -> "enquote";
+            case CALL_REGISTER -> "register";
             case UNRECOGNIZED -> throw new SQLException("CALL type not supported.");
         };
         return prefix + target.getResourceName();

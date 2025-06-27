@@ -17,7 +17,7 @@ import java.text.SimpleDateFormat;
 
 import static openjdbcproxy.helpers.SqlHelper.executeUpdate;
 
-public class MultipleTypesIntegrationTest {
+public class H2MultipleTypesIntegrationTest {
 
     @ParameterizedTest
     @CsvFileSource(resources = "/h2_connection.csv")

@@ -1,13 +1,17 @@
 package openjdbcproxy.jdbc;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Savepoint;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -17,10 +21,14 @@ public class SavepointTests {
 
     private Connection connection;
 
-    @BeforeEach
-    public void setUp() throws Exception {
-        connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+    @SneakyThrows
+    public void setUp(String driverClass, String url, String user, String pwd) throws SQLException {
+        Class.forName(driverClass);
+        connection = DriverManager.getConnection(url, user, pwd);
         connection.setAutoCommit(false);
+        connection.createStatement().execute(
+                "DROP TABLE IF EXISTS test_table"
+        );
         connection.createStatement().execute(
             "CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(255))"
         );
@@ -31,8 +39,10 @@ public class SavepointTests {
         if (connection != null) connection.close();
     }
 
-    @Test
-    public void testSavepoint() throws Exception {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/postgres_connection.csv")
+    public void testSavepoint(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         connection.createStatement().execute("INSERT INTO test_table (id, name) VALUES (1, 'Alice')");
         Savepoint savepoint = connection.setSavepoint();
 

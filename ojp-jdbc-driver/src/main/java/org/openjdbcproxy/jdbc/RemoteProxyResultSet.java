@@ -55,7 +55,8 @@ public class RemoteProxyResultSet implements ResultSet {
     private String resultSetUUID;
     private StatementService statementService;
     private Connection connection;
-    private Statement statement;
+    @Getter
+    protected Statement statement;
 
     public Connection getConnection() throws SQLException {
         if (this.getStatement() != null && this.getStatement().getConnection() != null) {
@@ -352,12 +353,12 @@ public class RemoteProxyResultSet implements ResultSet {
 
     @Override
     public boolean absolute(int row) throws SQLException {
-        return this.callProxy(CallType.CALL_ABSOLUTE, "", Boolean.class);
+        return this.callProxy(CallType.CALL_ABSOLUTE, "", Boolean.class, List.of(row));
     }
 
     @Override
     public boolean relative(int rows) throws SQLException {
-        return this.callProxy(CallType.CALL_RELATIVE, "", Boolean.class);
+        return this.callProxy(CallType.CALL_RELATIVE, "", Boolean.class, List.of(rows));
     }
 
     @Override
@@ -1040,9 +1041,9 @@ public class RemoteProxyResultSet implements ResultSet {
         ResultSet.super.updateObject(columnLabel, x, targetSqlType);
     }
 
-    private CallResourceRequest.Builder newCallBuilder() {
+    private CallResourceRequest.Builder newCallBuilder() throws SQLException {
         return CallResourceRequest.newBuilder()
-                .setSession(this.connection.getSession())
+                .setSession(this.getConnection().getSession())
                 .setResourceType(ResourceType.RES_RESULT_SET)
                 .setResourceUUID(this.resultSetUUID);
     }
@@ -1071,7 +1072,7 @@ public class RemoteProxyResultSet implements ResultSet {
                                 .build()
                 );
         CallResourceResponse response = this.statementService.callResource(reqBuilder.build());
-        this.connection.setSession(response.getSession());
+        this.getConnection().setSession(response.getSession());
         if (Void.class.equals(returnType)) {
             return null;
         }
@@ -1104,7 +1105,7 @@ public class RemoteProxyResultSet implements ResultSet {
                         .build()
         );
         CallResourceResponse response = this.statementService.callResource(reqBuilder.build());
-        this.connection.setSession(response.getSession());
+        this.getConnection().setSession(response.getSession());
         String lobRefUUID = deserialize(response.getValues().toByteArray(), String.class);
         BinaryStream binaryStream = new BinaryStream(
                 this.presentConnection(),
@@ -1123,6 +1124,6 @@ public class RemoteProxyResultSet implements ResultSet {
         if (this.statement != null && this.statement.getConnection() != null) {
             return (Connection) this.statement.getConnection();
         }
-        return this.connection;
+        return this.getConnection();
     }
 }
