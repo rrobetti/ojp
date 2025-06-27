@@ -1,20 +1,21 @@
 # This workflow builds and pushes the Docker image for the OJP server.
-# It should only trigger when there are changes in the `ojp-server` or `ojp-grpc-commons` modules.
-name: Main OJP Server Docker Image CI
+name: OJP Server Docker Image Build
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - '.github/workflows/main-docker.yml'
-      - 'ojp-server/**'
-      - 'ojp-grpc-commons/**'
-
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Docker image tag'
+        required: true
+        default: 'latest'
+      repository:
+        description: 'Repository name'
+        required: true
+        default: 'rrobetti'
 jobs:
   build-docker-image:
     name: Build Docker Image
     runs-on: ubuntu-latest
-    if: "! contains(toJSON(github.event.commits.*.message), '[skip ci]')"
 
     steps:
       - name: Git checkout
@@ -33,11 +34,11 @@ jobs:
         env:
           DOCKERHUB_USER: ${{ secrets.DOCKERHUB_USER }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          DOCKERHUB_REPO: ${{ vars.DOCKERHUB_REPO }}
+          DOCKERHUB_REPO: ${{ github.event.inputs.repository }}
         run: |
           mvn compile jib:build -pl ojp-server \
             -Djib.to.auth.username="${DOCKERHUB_USER}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}" \
-            -Djib.to.image="${DOCKERHUB_REPO}/ojp:latest" \
+            -Djib.to.image="${DOCKERHUB_REPO}/ojp:${{ github.event.inputs.tag }}" \
             -Djib.container.mainClass="org.openjdbcproxy.grpc.server.GrpcServer" \
             -Djib.container.ports=1059
