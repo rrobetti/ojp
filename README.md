@@ -28,7 +28,6 @@ postgresql://user@localhost
 * The OJP server is deployed as an independent service sitting and will serve as a smart proxy between the application(s) and their respective relational database(s) controlling the number of connections open against each database.
 * **Smart Connection Management***: The proxy ensures that database connections are allocated only when needed, improving scalability and resource utilization. In example below, only when executeQuery is called a real connection is enlisted to execute the operation, reducing the time that connection is hold and allowing for it to be used by other clients meanwhile:
 ```
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp[host:port]_h2:~/test", "sa", "");
 

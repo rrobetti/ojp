@@ -29,7 +29,6 @@ public class BasicCrudIntegrationTest {
     public void crudTestSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException {
         Assumptions.assumeFalse(isTestDisabled, "Skipping Postgres tests");
 
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);

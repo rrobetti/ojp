@@ -23,7 +23,6 @@ public class SavepointTests {
 
     @SneakyThrows
     public void setUp(String driverClass, String url, String user, String pwd) throws SQLException {
-        Class.forName(driverClass);
         connection = DriverManager.getConnection(url, user, pwd);
         connection.setAutoCommit(false);
         connection.createStatement().execute(

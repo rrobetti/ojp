@@ -170,13 +170,6 @@ public class PostgresMiniStressTest {
      * All queries are coded individually and marked if part of a transaction.
      */
     private static Connection getConnection(String driverClass, String url, String user, String password) throws SQLException {
-        if (url.startsWith("jdbc:ojp")) {
-            try {
-                Class.forName(driverClass);
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException(e);
-            }
-        }
         return DriverManager.getConnection(url, user, password);
     }
 

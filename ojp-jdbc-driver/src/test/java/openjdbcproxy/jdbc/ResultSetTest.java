@@ -26,7 +26,6 @@ public class ResultSetTest {
 
     @SneakyThrows
     public void setUp(String driverClass, String url, String user, String pwd) throws SQLException {
-        Class.forName(driverClass);
 
         // Create an in-memory H2 database connection
         connection = DriverManager.getConnection(url, user, pwd);

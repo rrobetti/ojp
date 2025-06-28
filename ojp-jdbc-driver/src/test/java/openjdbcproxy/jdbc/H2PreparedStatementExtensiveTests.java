@@ -36,7 +36,6 @@ public class H2PreparedStatementExtensiveTests {
     private PreparedStatement ps;
 
     public void setUp(String driverClass, String url, String user, String password) throws Exception {
-        Class.forName(driverClass);
         connection = DriverManager.getConnection(url, user, password);
         Statement stmt = connection.createStatement();
         try {

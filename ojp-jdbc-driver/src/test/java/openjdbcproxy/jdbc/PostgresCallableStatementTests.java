@@ -40,7 +40,6 @@ public class PostgresCallableStatementTests {
     }
 
     public void setUp(String driverClass, String url, String user, String password) throws Exception {
-        Class.forName(driverClass);
         // Connect to the PostgreSQL database
         connection = DriverManager.getConnection(url, user, password);
 

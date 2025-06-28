@@ -22,7 +22,6 @@ public class H2MultipleTypesIntegrationTest {
     @ParameterizedTest
     @CsvFileSource(resources = "/h2_connection.csv")
     public void typesCoverageTestSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, ParseException {
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);

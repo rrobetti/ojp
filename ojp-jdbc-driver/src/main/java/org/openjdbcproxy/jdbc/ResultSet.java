@@ -51,7 +51,6 @@ public class ResultSet extends RemoteProxyResultSet {
     private boolean closed;
     private AtomicInteger currentIdx = new AtomicInteger(0);
 
-    // New variable to track last value read
     private Object lastValueRead;
 
     public ResultSet(Iterator<OpResult> itOpResult, StatementService statementService, java.sql.Statement statement) throws SQLException {
