@@ -106,6 +106,7 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
     @Override
     public ResultSet executeQuery() throws SQLException {
         this.checkClosed();
+        log.info("Executing query for -> {}", this.sql);
         Iterator<OpResult> itOpResult = this.statementService
                 .executeQuery(this.connection.getSession(), this.sql, this.paramsMap.values().stream().toList(), this.properties);
         return new ResultSet(itOpResult, this.statementService, this);

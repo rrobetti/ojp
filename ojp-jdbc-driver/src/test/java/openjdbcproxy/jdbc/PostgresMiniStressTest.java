@@ -1,6 +1,7 @@
 package openjdbcproxy.jdbc;
 
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.codehaus.plexus.util.ExceptionUtils;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvFileSource;
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+@Slf4j
 public class PostgresMiniStressTest {
     private static final int THREADS = 10; // Number of worker threads
     private static final int RAMPUP_MS = 10 * 1000; // 10 seconds Ramp-up window in milliseconds
@@ -132,7 +134,6 @@ public class PostgresMiniStressTest {
         }
         long globalEnd = System.nanoTime();
 
-
         // 3. Reporting
         int numQueries = totalQueries.get();
         int numFailures = failedQueries.get();
@@ -145,10 +146,10 @@ public class PostgresMiniStressTest {
         System.out.println("Total test duration: " + totalTimeMs + " ms");
         System.out.printf("Average query duration: %.3f ms\n", avgQueryMs);
         System.out.println("Total query failures: " + numFailures);
-        assertEquals(670, numQueries);
+        assertEquals(680, numQueries);
         assertEquals(10, numFailures);
-        assertTrue(totalTimeMs < 20000);
-        assertTrue(avgQueryMs < 30);
+        assertTrue(totalTimeMs < 30000);
+        assertTrue(avgQueryMs < 50);
     }
 
     private static void timeAndRun(Callable<Void> query) {
@@ -175,8 +176,8 @@ public class PostgresMiniStressTest {
 
     private static void runExactQuerySequence(int threadNum, String driverClass, String url, String user, String password) {
         // Transaction Block 1: create user, create order for that user, add order items
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 conn.setAutoCommit(false);
                 try (PreparedStatement pstUser = conn.prepareStatement(
                         "INSERT INTO users (username, email) VALUES (?, ?) RETURNING id")) {
@@ -211,19 +212,16 @@ public class PostgresMiniStressTest {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-                return null;
-            });
-        } catch (SQLException e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed unexpectedly: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
+            }
+            return null;
+        });
 
         // Transaction Block 2: update product price and log a review for the product
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 conn.setAutoCommit(false);
                 try (PreparedStatement pstUpdate = conn.prepareStatement(
                         "UPDATE products SET price = price + 1 WHERE id = ?")) {
@@ -244,19 +242,16 @@ public class PostgresMiniStressTest {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-                return null;
-            });
-        } catch (SQLException e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed unexpectedly: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
+            }
+            return null;
+        });
 
         // Transaction Block 3: delete and recreate a review
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 conn.setAutoCommit(false);
                 try {
                     try (PreparedStatement pstDel = conn.prepareStatement(
@@ -280,283 +275,279 @@ public class PostgresMiniStressTest {
                 } finally {
                     conn.setAutoCommit(true);
                 }
-                return null;
-            });
-        } catch (SQLException e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed unexpectedly: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage() + " \n " + ExceptionUtils.getStackTrace(e));
+            }
+            return null;
+        });
 
         // Queries 4-100: Each query uses its own connection
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userA");
                     pst.setString(2, "userA@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userB");
                     pst.setString(2, "userB@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userC");
                     pst.setString(2, "userC@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE users SET email=? WHERE id=?")) {
                     pst.setString(1, "changed1@example.com");
                     pst.setInt(2, 1);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE users SET email=? WHERE id=?")) {
                     pst.setString(1, "changed2@example.com");
                     pst.setInt(2, 2);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE users SET username=? WHERE id=?")) {
                     pst.setString(1, "userA_updated");
                     pst.setInt(2, 1);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userD");
                     pst.setString(2, "userD@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userE");
                     pst.setString(2, "userE@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE users SET email=? WHERE id=?")) {
                     pst.setString(1, "changed3@example.com");
                     pst.setInt(2, 3);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO users (username, email) VALUES (?, ?)")) {
                     pst.setString(1, "userF");
                     pst.setString(2, "userF@example.com");
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
         // -- Product insert/update
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductA");
                     pst.setBigDecimal(2, new BigDecimal("123.45"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductB");
                     pst.setBigDecimal(2, new BigDecimal("67.89"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductC");
                     pst.setBigDecimal(2, new BigDecimal("250.00"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE products SET price=? WHERE id=?")) {
                     pst.setBigDecimal(1, new BigDecimal("199.99"));
                     pst.setInt(2, 1);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE products SET price=? WHERE id=?")) {
                     pst.setBigDecimal(1, new BigDecimal("299.99"));
                     pst.setInt(2, 2);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductD");
                     pst.setBigDecimal(2, new BigDecimal("111.11"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductE");
                     pst.setBigDecimal(2, new BigDecimal("77.77"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE products SET name=? WHERE id=?")) {
                     pst.setString(1, "ProductA-Updated");
                     pst.setInt(2, 1);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("UPDATE products SET name=? WHERE id=?")) {
                     pst.setString(1, "ProductB-Updated");
                     pst.setInt(2, 2);
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("INSERT INTO products (name, price) VALUES (?, ?)")) {
                     pst.setString(1, "ProductF");
                     pst.setBigDecimal(2, new BigDecimal("333.33"));
                     pst.execute();
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM orders WHERE id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -565,15 +556,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM orders WHERE user_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -582,15 +573,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM orders")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -598,15 +589,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM orders WHERE user_id=?")) {
                     pst.setInt(1, 2);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -615,15 +606,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM orders ORDER BY order_date DESC LIMIT 10")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -631,15 +622,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM order_items WHERE order_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -648,15 +639,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM order_items WHERE id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -665,15 +656,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM order_items")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -681,32 +672,58 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
-                try (PreparedStatement pst = conn.prepareStatement("SELECT SUM(quantity) FROM order_items WHERE order_id=?")) {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
+                try (PreparedStatement pst = conn.prepareStatement("SELECT count(*) FROM order_items WHERE order_id=?")) {
                     pst.setInt(1, 1);
+                    log.info("select count of quantities from order_items for order_id = " + 1);
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
-                            rs.getLong(1);
+                            Long sum  = rs.getLong(1);
+                            log.info("count returned = " + sum);
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
+                try (PreparedStatement pst = conn.prepareStatement("SELECT SUM(quantity) FROM order_items WHERE order_id=?")) {
+                    pst.setInt(1, 1);
+                    log.info("select sum of quantities from order_items for order_id = " + 1);
+                    try (ResultSet rs = pst.executeQuery()) {
+                        while (rs.next()) {
+                            rs.getObject(1);
+                            if (rs.wasNull()) {
+                                log.info("Result was null");
+                            } else {
+                                Long sum = rs.getLong(1);
+                                log.info("sum returned = " + sum);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT AVG(quantity) FROM order_items")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -714,15 +731,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM reviews WHERE id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -731,15 +748,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM reviews WHERE product_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -748,15 +765,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM reviews")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -764,15 +781,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT AVG(rating) FROM reviews WHERE product_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -781,15 +798,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM reviews WHERE user_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -798,15 +815,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT u.username, o.id FROM users u JOIN orders o ON u.id = o.user_id WHERE u.id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -815,15 +832,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT oi.id, p.name FROM order_items oi JOIN products p ON oi.product_id=p.id WHERE oi.order_id=?")) {
                     pst.setInt(1, 1);
                     try (ResultSet rs = pst.executeQuery()) {
@@ -832,15 +849,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT user_id, COUNT(*) FROM orders GROUP BY user_id")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -849,15 +866,15 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT AVG(quantity) FROM order_items")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -865,17 +882,17 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
         for (int i = 0; i < 7; i++) {
             final int idx = i + 2;
-            try (Connection conn = getConnection(driverClass, url, user, password)) {
-                timeAndRun(() -> {
+            timeAndRun(() -> {
+                try (Connection conn = getConnection(driverClass, url, user, password)) {
                     try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM orders WHERE id=?")) {
                         pst.setInt(1, idx);
                         try (ResultSet rs = pst.executeQuery()) {
@@ -884,14 +901,14 @@ public class PostgresMiniStressTest {
                             }
                         }
                     }
-                    return null;
-                });
-            } catch (Exception e) {
-                failedQueries.incrementAndGet();
-                System.err.println("Query failed: " + e.getMessage());
-            }
-            try (Connection conn = getConnection(driverClass, url, user, password)) {
-                timeAndRun(() -> {
+                } catch (Exception e) {
+                    failedQueries.incrementAndGet();
+                    System.err.println("Query failed: " + e.getMessage());
+                }
+                return null;
+            });
+            timeAndRun(() -> {
+                try (Connection conn = getConnection(driverClass, url, user, password)) {
                     try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM users WHERE id=?")) {
                         pst.setInt(1, idx);
                         try (ResultSet rs = pst.executeQuery()) {
@@ -900,14 +917,14 @@ public class PostgresMiniStressTest {
                             }
                         }
                     }
-                    return null;
-                });
-            } catch (Exception e) {
-                failedQueries.incrementAndGet();
-                System.err.println("Query failed: " + e.getMessage());
-            }
-            try (Connection conn = getConnection(driverClass, url, user, password)) {
-                timeAndRun(() -> {
+                } catch (Exception e) {
+                    failedQueries.incrementAndGet();
+                    System.err.println("Query failed: " + e.getMessage());
+                }
+                return null;
+            });
+            timeAndRun(() -> {
+                try (Connection conn = getConnection(driverClass, url, user, password)) {
                     try (PreparedStatement pst = conn.prepareStatement("SELECT * FROM products WHERE id=?")) {
                         pst.setInt(1, idx);
                         try (ResultSet rs = pst.executeQuery()) {
@@ -916,16 +933,16 @@ public class PostgresMiniStressTest {
                             }
                         }
                     }
-                    return null;
-                });
-            } catch (Exception e) {
-                failedQueries.incrementAndGet();
-                System.err.println("Query failed: " + e.getMessage());
-            }
+                } catch (Exception e) {
+                    failedQueries.incrementAndGet();
+                    System.err.println("Query failed: " + e.getMessage());
+                }
+                return null;
+            });
         }
 
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM users")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -933,14 +950,14 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM orders")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -948,14 +965,14 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("SELECT COUNT(*) FROM reviews")) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
@@ -963,16 +980,16 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
 
         // Heavy query, will fail every time
-        try (Connection conn = getConnection(driverClass, url, user, password)) {
-            timeAndRun(() -> {
+        timeAndRun(() -> {
+            try (Connection conn = getConnection(driverClass, url, user, password)) {
                 try (PreparedStatement pst = conn.prepareStatement("""
                         SELECT
                           u.id,
@@ -993,11 +1010,11 @@ public class PostgresMiniStressTest {
                         }
                     }
                 }
-                return null;
-            });
-        } catch (Exception e) {
-            failedQueries.incrementAndGet();
-            System.err.println("Query failed: " + e.getMessage());
-        }
+            } catch (Exception e) {
+                failedQueries.incrementAndGet();
+                System.err.println("Query failed: " + e.getMessage());
+            }
+            return null;
+        });
     }
 }
