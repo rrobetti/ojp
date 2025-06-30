@@ -29,21 +29,26 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>com.jolira</groupId>
-        <artifactId>onejar-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <goals>
-              <goal>one-jar</goal>
-            </goals>
-            <configuration>
-              <mainClass>org.baeldung.executable.
-                                ExecutableMavenJar</mainClass>
-              <attachToBuild>true</attachToBuild>
-              <filename>${project.build.finalName}.${project.packaging}</filename>
-            </configuration>
-          </execution>
-        </executions>
+        <groupId>com.google.cloud.tools</groupId>
+        <artifactId>jib-maven-plugin</artifactId>
+        <version>${jib.plugin.version}</version>
+        <configuration>
+          <from>
+            <image>eclipse-temurin:22-jre</image>
+          </from>
+          <to>
+            <image>rrobetti/ojp:0.0.3-alpha</image>
+          </to>
+          <container>
+            <mainClass>org.openjdbcproxy.grpc.server.GrpcServer</mainClass>
+            <ports>
+              <port>1059</port>
+            </ports>
+            <jvmFlags>
+              <jvmFlag>-Dorg.slf4j.simpleLogger.defaultLogLevel=error</jvmFlag>
+            </jvmFlags>
+          </container>
+        </configuration>
       </plugin>
     </plugins>
   </build>
@@ -54,9 +59,54 @@
       <version>1.18.36</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>4.13.2</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>hamcrest-core</artifactId>
+          <groupId>org.hamcrest</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.12.1</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>junit-jupiter-api</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-engine</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <version>5.12.1</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>apiguardian-api</artifactId>
+          <groupId>org.apiguardian</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>junit-jupiter-api</artifactId>
+          <groupId>org.junit.jupiter</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
   </dependencies>
   <properties>
     <slf4j.version>2.0.17</slf4j.version>
+    <jib.plugin.version>3.4.5</jib.plugin.version>
     <grpc.version>1.70.0</grpc.version>
   </properties>
 </project>
