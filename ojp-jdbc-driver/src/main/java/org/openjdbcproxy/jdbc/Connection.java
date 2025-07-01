@@ -30,11 +30,16 @@ import java.sql.SQLWarning;
 import java.sql.SQLXML;
 import java.sql.Savepoint;
 import java.sql.Struct;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.openjdbcproxy.grpc.SerializationHandler.deserialize;
 import static org.openjdbcproxy.grpc.SerializationHandler.serialize;
@@ -47,13 +52,11 @@ public class Connection implements java.sql.Connection {
     private final StatementService statementService;
     private boolean autoCommit = true;
     private boolean readOnly = false;
-    private SessionTerminationTrigger sessionTerminationTrigger;
     private boolean closed;
 
     public Connection(SessionInfo session, StatementService statementService) {
         this.session = session;
         this.statementService = statementService;
-        this.sessionTerminationTrigger = new SessionTerminationTrigger();
         this.closed = false;
     }
 
@@ -87,12 +90,6 @@ public class Connection implements java.sql.Connection {
             //If switching autocommit off, start a new transaction
         } else if (this.autoCommit && !autoCommit) {
             this.session = this.statementService.startTransaction(this.session);
-        }
-
-        if (!this.autoCommit && autoCommit) {
-            if (this.sessionTerminationTrigger.triggerIssued(true, null, null)) {
-                this.close();
-            }
         }
 
         this.autoCommit = autoCommit;
@@ -148,12 +145,6 @@ public class Connection implements java.sql.Connection {
         if (!DbInfo.isH2DB()) {
             this.readOnly = readOnly;
         }
-
-        if (readOnly) {
-            if (this.sessionTerminationTrigger.triggerIssued(null, true, null)) {
-                this.close();
-            }
-        }
     }
 
     @Override
@@ -188,25 +179,35 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public void clearWarnings() throws SQLException {
-        if (this.sessionTerminationTrigger.triggerIssued(null, null, true)) {
-            this.close();
-        }
     }
 
     @Override
     public java.sql.Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-        return new Statement(this, statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
-                        CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY)
-                , i -> List.of(resultSetType, resultSetConcurrency)));
+        return new Statement(this, statementService, this.hashMapOf(
+                List.of(
+                        CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
+                        CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY
+                ), List.of(resultSetType, resultSetConcurrency)
+        ));
     }
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency) throws SQLException {
-        return new PreparedStatement(this, sql, this.statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
-                        CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY)
-                , i -> List.of(resultSetType, resultSetConcurrency)));
+
+        return new PreparedStatement(this, sql, statementService, this.hashMapOf(
+                List.of(
+                        CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
+                        CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY
+                ), List.of(resultSetType, resultSetConcurrency))
+        );
+    }
+
+    private Map<String, Object> hashMapOf(List<String> keys, List<Object> values) {
+        Map<String, Object> map = new HashMap<>();
+        for (int i = 0; i < keys.size(); i++) {
+            map.put(keys.get(i), values.get(i));
+        }
+        return map;
     }
 
     @Override
@@ -262,21 +263,21 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public java.sql.Statement createStatement(int resultSetType, int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-        return new Statement(this, statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
+        return new Statement(this, statementService, this.hashMapOf(
+                List.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
                         CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY,
                         CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY)
-                , i -> List.of(resultSetType, resultSetConcurrency, resultSetHoldability)));
+                , List.of(resultSetType, resultSetConcurrency, resultSetHoldability)));
     }
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency,
                                                        int resultSetHoldability) throws SQLException {
-        return new PreparedStatement(this, sql, this.statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
+        return new PreparedStatement(this, sql, this.statementService, this.hashMapOf(
+                List.of(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY,
                         CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY,
                         CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY)
-                , i -> List.of(resultSetType, resultSetConcurrency, resultSetHoldability)));
+                , List.of(resultSetType, resultSetConcurrency, resultSetHoldability)));
     }
 
     @Override
@@ -288,23 +289,25 @@ public class Connection implements java.sql.Connection {
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-        return new PreparedStatement(this, sql, this.statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_AUTO_GENERATED_KEYS_KEY)
-                , i -> List.of(autoGeneratedKeys)));
+        return new PreparedStatement(this, sql, this.statementService, this.hashMapOf(
+                List.of(CommonConstants.STATEMENT_AUTO_GENERATED_KEYS_KEY)
+                , List.of(autoGeneratedKeys)));
     }
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-        return new PreparedStatement(this, sql, this.statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY)
-                , i -> List.of(columnIndexes)));
+        return new PreparedStatement(this, sql, this.statementService, this.hashMapOf(
+                List.of(CommonConstants.STATEMENT_COLUMN_INDEXES_KEY)
+                , List.of(columnIndexes)));
     }
 
     @Override
     public java.sql.PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-        return new PreparedStatement(this, sql, this.statementService, Maps.asMap(
-                ImmutableSet.of(CommonConstants.STATEMENT_COLUMN_NAMES_KEY)
-                , i -> List.of(columnNames)));
+        List values = new ArrayList();
+        values.add(columnNames);
+        return new PreparedStatement(this, sql, this.statementService, this.hashMapOf(
+                List.of(CommonConstants.STATEMENT_COLUMN_NAMES_KEY)
+                , values));
     }
 
     @Override

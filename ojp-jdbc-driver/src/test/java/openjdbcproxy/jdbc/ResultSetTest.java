@@ -1,9 +1,9 @@
 package openjdbcproxy.jdbc;
 
+import lombok.SneakyThrows;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -18,17 +18,17 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-@Disabled
 public class ResultSetTest {
 
     private Connection connection;
     private Statement statement;
     private ResultSet resultSet;
 
-    @BeforeEach
-    public void setUp() throws SQLException {
+    @SneakyThrows
+    public void setUp(String driverClass, String url, String user, String pwd) throws SQLException {
+
         // Create an in-memory H2 database connection
-        connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+        connection = DriverManager.getConnection(url, user, pwd);
 
         // Create a scrollable and read-only Statement
         statement = connection.createStatement(
@@ -37,6 +37,11 @@ public class ResultSetTest {
         );
 
         // Create a test table and insert data
+        try {
+            statement.execute("DROP TABLE test_table");
+        } catch (Exception e) {
+            //Expected if table does not exist.
+        }
         statement.execute("CREATE TABLE test_table (id INT PRIMARY KEY, name VARCHAR(255), age INT, salary DECIMAL(10,2), active BOOLEAN, created_at TIMESTAMP)");
         statement.execute("INSERT INTO test_table (id, name, age, salary, active, created_at) VALUES (1, 'Alice', 30, 50000.00, TRUE, CURRENT_TIMESTAMP)");
         statement.execute("INSERT INTO test_table (id, name, age, salary, active, created_at) VALUES (2, 'Bob', 25, 45000.00, FALSE, CURRENT_TIMESTAMP)");
@@ -54,8 +59,10 @@ public class ResultSetTest {
         if (connection != null) connection.close();
     }
 
-    @Test
-    public void testNavigationMethods() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testNavigationMethods(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         assertTrue(resultSet.next()); // Row 1
         assertTrue(resultSet.next()); // Row 2
         assertTrue(resultSet.previous()); // Back to Row 1
@@ -67,8 +74,10 @@ public class ResultSetTest {
         assertFalse(resultSet.isBeforeFirst());
     }
 
-    @Test
-    public void testDataRetrievalMethods() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testDataRetrievalMethods(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         resultSet.next();
         assertEquals(1, resultSet.getInt("id"));
         assertEquals("Alice", resultSet.getString("name"));
@@ -79,8 +88,10 @@ public class ResultSetTest {
         assertNotNull(resultSet.getTimestamp("created_at"));
     }
 
-    @Test
-    public void testGetMethodsByColumnIndex() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testGetMethodsByColumnIndex(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         resultSet.next();
         assertEquals(1, resultSet.getInt(1)); // id
         assertEquals("Alice", resultSet.getString(2)); // name
@@ -90,8 +101,10 @@ public class ResultSetTest {
         assertNotNull(resultSet.getDate(6)); // created_at
     }
 
-    @Test
-    public void testNullHandling() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testNullHandling(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         statement.execute("INSERT INTO test_table (id, name, age, salary, active, created_at) VALUES (5, NULL, NULL, NULL, NULL, NULL)");
         resultSet = statement.executeQuery("SELECT * FROM test_table WHERE id = 5");
         assertTrue(resultSet.next());
@@ -99,8 +112,10 @@ public class ResultSetTest {
         assertTrue(resultSet.wasNull());
     }
 
-    @Test
-    public void testUpdateMethods() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testUpdateMethods(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         resultSet.moveToInsertRow();
         resultSet.updateInt("id", 4);
         resultSet.updateString("name", "David");
@@ -114,8 +129,10 @@ public class ResultSetTest {
         assertEquals("David", resultSet.getString("name"));
     }
 
-    @Test
-    public void testCursorPositionMethods() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testCursorPositionMethods(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         assertTrue(resultSet.first());
         assertFalse(resultSet.isBeforeFirst());
         assertFalse(resultSet.isAfterLast());
@@ -126,14 +143,18 @@ public class ResultSetTest {
         assertTrue(resultSet.next());
     }
 
-    @Test
-    public void testWarnings() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testWarnings(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         SQLWarning warning = resultSet.getWarnings();
         assertNull(warning); // No warnings for this ResultSet
     }
 
-    @Test
-    public void testAdvancedNavigation() throws SQLException {
+    @ParameterizedTest
+    @CsvFileSource(resources = "/h2_postgres_connections.csv")
+    public void testAdvancedNavigation(String driverClass, String url, String user, String pwd) throws SQLException {
+        setUp(driverClass, url, user, pwd);
         resultSet.absolute(2); // Move to the second row
         assertEquals("Bob", resultSet.getString("name"));
 

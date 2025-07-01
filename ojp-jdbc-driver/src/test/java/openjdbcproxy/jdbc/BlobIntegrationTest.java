@@ -21,7 +21,6 @@ public class BlobIntegrationTest {
     @ParameterizedTest
     @CsvFileSource(resources = "/h2_connection.csv")
     public void createAndReadingBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);
@@ -86,7 +85,6 @@ public class BlobIntegrationTest {
     @ParameterizedTest
     @CsvFileSource(resources = "/h2_connection.csv")
     public void creatingAndReadingLargeBLOBsSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);

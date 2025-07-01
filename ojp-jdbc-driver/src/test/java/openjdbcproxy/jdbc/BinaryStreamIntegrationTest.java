@@ -31,7 +31,6 @@ public class BinaryStreamIntegrationTest {
     public void createAndReadingBinaryStreamSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Assumptions.assumeFalse(isTestDisabled, "Skipping Postgres tests");
 
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);
@@ -94,7 +93,6 @@ public class BinaryStreamIntegrationTest {
     public void createAndReadingLargeBinaryStreamSuccessful(String driverClass, String url, String user, String pwd) throws SQLException, ClassNotFoundException, IOException {
         Assumptions.assumeFalse(isTestDisabled, "Skipping Postgres tests");
 
-        Class.forName(driverClass);
         Connection conn = DriverManager.getConnection(url, user, pwd);
 
         System.out.println("Testing for url -> " + url);

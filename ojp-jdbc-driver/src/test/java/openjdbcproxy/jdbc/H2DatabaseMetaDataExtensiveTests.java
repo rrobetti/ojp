@@ -11,7 +11,6 @@ public class H2DatabaseMetaDataExtensiveTests {
     private static Connection connection;
 
     public void setUp(String driverClass, String url, String user, String password) throws Exception {
-        Class.forName(driverClass);
         connection = DriverManager.getConnection(url, user, password);
         try {
             connection.createStatement().execute(

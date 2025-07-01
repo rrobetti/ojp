@@ -11,7 +11,10 @@ public class GrpcServer {
     public static void main(String[] args) throws IOException, InterruptedException {
         Server server = ServerBuilder
                 .forPort(CommonConstants.DEFAULT_PORT_NUMBER)
-                .addService(new StatementServiceImpl(new SessionManagerImpl())).build();
+                .addService(new StatementServiceImpl(
+                        new SessionManagerImpl(),
+                        new CircuitBreaker(60000)//TODO pass as parameter currently
+                )).build();
 
         server.start();
         server.awaitTermination();

@@ -28,7 +28,6 @@ postgresql://user@localhost
 * The OJP server is deployed as an independent service sitting and will serve as a smart proxy between the application(s) and their respective relational database(s) controlling the number of connections open against each database.
 * **Smart Connection Management***: The proxy ensures that database connections are allocated only when needed, improving scalability and resource utilization. In example below, only when executeQuery is called a real connection is enlisted to execute the operation, reducing the time that connection is hold and allowing for it to be used by other clients meanwhile:
 ```
-        Class.forName("org.openjdbcproxy.jdbc.Driver");
         Connection conn = DriverManager.
                 getConnection("jdbc:ojp[host:port]_h2:~/test", "sa", "");
 
@@ -61,7 +60,7 @@ The ojp-server is a gRPC server that manages a Hikari connection pool and abstra
 
 #### How to start a docker image
 
-> docker run --rm -d -p 1059:1059 rrobetti/ojp:0.0.1-alpha
+> docker run --rm -d -p 1059:1059 rrobetti/ojp:0.0.3-alpha
 
 ### ojp-jdbc-driver
 The ojp-jdbc-driver is an implementation of the JDBC specification. It connects to the ojp-server via the gRPC protocol, sending SQL statements to be executed against the database and reading the responses. The driver works with virtual connections provided by the ojp-server, allowing the application to interact with the database without directly managing real database connections.
@@ -111,8 +110,10 @@ Optional flags:
 - ❌ CLOB support.
 - ✅ Statement and Prepared statement advanced features.
 - ✅ Connection advanced features.
-- ❌ OpenTelemetry implementation.
-- 🕓 Docker image implementation.
+- 🕓 OpenTelemetry implementation.
+- ✅ Circuit Breaker.
+- ❌ Slow queries segregation.
+- ✅ Docker image implementation.
 - ❌ Support for Spring Boot/Spring Data.
 - ❌ Support for Micronaut.
 - ❌ Support for Quarkus.
@@ -121,8 +122,10 @@ Optional flags:
 - ❌ Configurable data sources by user and/or database. 
 - ❌ RAFT consensus POC.
 - ❌ RAFT and connection smart balancing and resizing.
-- ❌ Docker compose for (RAFT) cluster. 
-Other feature candidates: Query Routing, Sharding, Query Caching, Read/Write Splitting, Multi-Cloud/Distributed Clustering, Authentication Integration, Advanced Security Features, Failover and Automatic Replication Awareness 
+
+
+#### Other feature candidates: 
+Query Routing, Sharding, Query Caching, Read/Write Splitting, Multi-Cloud/Distributed Clustering, Authentication Integration, Advanced Security Features, Failover and Automatic Replication Awareness 
 
 ✅ - Done
 ❌ - Not started

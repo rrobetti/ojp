@@ -16,7 +16,6 @@ public class ResultSetMetaDataExtensiveTests {
 
     @SneakyThrows
     public void setUp(String driverClass, String url, String user, String password) throws SQLException {
-        Class.forName(driverClass);
         connection = DriverManager.getConnection(url, user, password);
         Statement statement = connection.createStatement();
 

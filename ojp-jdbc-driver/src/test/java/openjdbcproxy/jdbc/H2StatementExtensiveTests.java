@@ -25,7 +25,6 @@ public class H2StatementExtensiveTests {
     private Statement statement;
 
     public void setUp(String driverClass, String url, String user, String password) throws Exception {
-        Class.forName(driverClass);
         connection = DriverManager.getConnection(url, user, password);
         statement = connection.createStatement();
 

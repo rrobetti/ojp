@@ -35,6 +35,7 @@ import org.openjdbcproxy.grpc.dto.Parameter;
 
 import java.io.InputStream;
 import java.io.Writer;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -82,6 +83,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     //TODO put the datasource at database level not user + database so if more than one user agaist the DB still maintain the max pool size
     private final Map<String, HikariDataSource> datasourceMap = new ConcurrentHashMap<>();
     private final SessionManager sessionManager;
+    private final CircuitBreaker circuitBreaker;
 
     static {
         //TODO register all JDBC drivers supported here.
@@ -128,6 +130,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void executeUpdate(StatementRequest request, StreamObserver<OpResult> responseObserver) {
         log.info("Executing update {}", request.getSql());
+        String stmtHash = SqlStatementXXHash.hashSqlQuery(request.getSql());
         int updated = 0;
         SessionInfo returnSessionInfo = request.getSession();
         ConnectionSessionDTO dto = ConnectionSessionDTO.builder().build();
@@ -186,7 +189,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         .setValue(ByteString.copyFrom(serialize(updated))).build());
             }
             responseObserver.onCompleted();
+            circuitBreaker.onSuccess(stmtHash);
         } catch (SQLException e) {// Need a second catch just for the acquisition of the connection
+            circuitBreaker.onFailure(stmtHash, e);
             log.error("Failure during update execution: " + e.getMessage(), e);
             sendSQLExceptionMetadata(e, responseObserver);
         } finally {
@@ -208,33 +213,38 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             return false;
         }
         Map<String, Object> properties = deserialize(request.getProperties().toByteArray(), Map.class);
-        return (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
+        Boolean batchFlag = (Boolean) properties.get(CommonConstants.PREPARED_STATEMENT_ADD_BATCH_FLAG);
+        return batchFlag != null && batchFlag;
     }
 
     private Statement createStatement(Connection connection, StatementRequest request) throws SQLException {
-        if (StringUtils.isNotEmpty(request.getStatementUUID())) {
-            return this.sessionManager.getStatement(request.getSession(), request.getStatementUUID());
-        }
-        if (request.getProperties().isEmpty()) {
-            return connection.createStatement();
-        }
-        Map<String, Object> properties = deserialize(request.getParameters().toByteArray(), Map.class);
+        try {
+            if (StringUtils.isNotEmpty(request.getStatementUUID())) {
+                return this.sessionManager.getStatement(request.getSession(), request.getStatementUUID());
+            }
+            if (request.getProperties().isEmpty()) {
+                return connection.createStatement();
+            }
+            Map<String, Object> properties = deserialize(request.getProperties().toByteArray(), Map.class);
 
-        if (properties.isEmpty()) {
-            return connection.createStatement();
+            if (properties.isEmpty()) {
+                return connection.createStatement();
+            }
+            if (properties.size() == 2) {
+                return connection.createStatement(
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
+            }
+            if (properties.size() == 3) {
+                return connection.createStatement(
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
+                        (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
+            }
+            throw new SQLException("Incorrect number of properties for creating a new statement.");
+        } catch (RuntimeException re) {
+            throw new SQLException("Unable to create statement: " + re.getMessage(), re);
         }
-        if (properties.size() == 2) {
-            return connection.createStatement(
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY));
-        }
-        if (properties.size() == 3) {
-            return connection.createStatement(
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_TYPE_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_CONCURRENCY_KEY),
-                    (Integer) properties.get(CommonConstants.STATEMENT_RESULT_SET_HOLDABILITY_KEY));
-        }
-        throw new SQLException("Incorrect number of properties for creating a new statement.");
     }
 
     private PreparedStatement createPreparedStatement(ConnectionSessionDTO dto, String sql, List<Parameter> params,
@@ -294,7 +304,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
     @Override
     public void executeQuery(StatementRequest request, StreamObserver<OpResult> responseObserver) {
         log.info("Executing query for {}", request.getSql());
+        String stmtHash = SqlStatementXXHash.hashSqlQuery(request.getSql());
         try {
+            circuitBreaker.preCheck(stmtHash);
             ConnectionSessionDTO dto = this.sessionConnection(request.getSession(), true);
 
             List<Parameter> params = deserialize(request.getParameters().toByteArray(), List.class);
@@ -308,8 +320,9 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
                         stmt.executeQuery(request.getSql()));
                 this.handleResultSet(dto.getSession(), resultSetUUID, responseObserver);
             }
-
+            circuitBreaker.onSuccess(stmtHash);
         } catch (SQLException e) {
+            circuitBreaker.onFailure(stmtHash, e);
             log.error("Failure during query execution: " + e.getMessage(), e);
             sendSQLExceptionMetadata(e, responseObserver);
         }
@@ -835,6 +848,13 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             responseObserver.onCompleted();
         } catch (SQLException se) {
             sendSQLExceptionMetadata(se, responseObserver);
+        } catch (InvocationTargetException e) {
+            if (e.getTargetException() instanceof SQLException sqlException) {
+                sendSQLExceptionMetadata(sqlException, responseObserver);
+            } else {
+                sendSQLExceptionMetadata(new SQLException("Unable to call resource: " + e.getTargetException().getMessage()),
+                        responseObserver);
+            }
         } catch (Exception e) {
             sendSQLExceptionMetadata(new SQLException("Unable to call resource: " + e.getMessage()), responseObserver);
         }
@@ -927,6 +947,7 @@ public class StatementServiceImpl extends StatementServiceGrpc.StatementServiceI
             case CALL_EXECUTE -> "execute";
             case CALL_ADD -> "add";
             case CALL_ENQUOTE -> "enquote";
+            case CALL_REGISTER -> "register";
             case UNRECOGNIZED -> throw new SQLException("CALL type not supported.");
         };
         return prefix + target.getResourceName();
