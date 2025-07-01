@@ -26,27 +26,21 @@ public class BlobIntegrationTest {
         System.out.println("Testing for url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table_blob
-                            """);
+            executeUpdate(conn, "drop table test_table_blob");
         } catch (Exception e) {
             //If fails disregard as per the table is most possibly not created yet
         }
 
         executeUpdate(conn,
-                """
-                create table test_table_blob(
-                         val_blob  BLOB,
-                         val_blob2 BLOB,
-                         val_blob3 BLOB
-                )
-                """);
+                "create table test_table_blob(" +
+                        " val_blob  BLOB," +
+                        " val_blob2 BLOB," +
+                        " val_blob3 BLOB" +
+                        ")"
+        );
 
         PreparedStatement psInsert = conn.prepareStatement(
-                """
-                    insert into test_table_blob (val_blob, val_blob2, val_blob3) values (?, ?, ?)
-                    """
+                " insert into test_table_blob (val_blob, val_blob2, val_blob3) values (?, ?, ?)"
         );
 
         String testString = "TEST STRING BLOB";
@@ -81,11 +75,7 @@ public class BlobIntegrationTest {
         String fromBlobByIdx3 = new String(blobResult3.getBinaryStream().readAllBytes());
         Assert.assertEquals(testString2.substring(0, 5), fromBlobByIdx3);
 
-        executeUpdate(conn,
-                """
-                    delete from test_table_blob
-                    """
-        );
+        executeUpdate(conn, "delete from test_table_blob");
 
         resultSet.close();
         psSelect.close();
@@ -100,25 +90,19 @@ public class BlobIntegrationTest {
         System.out.println("Testing for url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table_blob
-                            """);
+            executeUpdate(conn, "drop table test_table_blob");
         } catch (Exception e) {
             //If fails disregard as per the table is most possibly not created yet
         }
 
         executeUpdate(conn,
-                """
-                create table test_table_blob(
-                         val_blob  BLOB
-                )
-                """);
+                "create table test_table_blob(" +
+                        " val_blob  BLOB" +
+                        ")"
+        );
 
         PreparedStatement psInsert = conn.prepareStatement(
-                """
-                    insert into test_table_blob (val_blob) values (?)
-                    """
+                "insert into test_table_blob (val_blob) values (?)"
         );
 
 
@@ -152,11 +136,7 @@ public class BlobIntegrationTest {
             byteFile = inputStreamTestFile.read();
         }
 
-        executeUpdate(conn,
-                """
-                    delete from test_table_blob
-                    """
-        );
+        executeUpdate(conn, "delete from test_table_blob");
 
         resultSet.close();
         psSelect.close();
