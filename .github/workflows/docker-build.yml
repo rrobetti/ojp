@@ -36,7 +36,9 @@ jobs:
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
           DOCKERHUB_REPO: ${{ github.event.inputs.repository }}
         run: |
-          mvn compile jib:build -pl ojp-server \
+            mvn install -N -DskipTests
+            mvn install -pl ojp-grpc-commons -DskipTests
+            mvn compile jib:build -pl ojp-server \
             -Djib.to.auth.username="${DOCKERHUB_USER}" \
             -Djib.to.auth.password="${DOCKERHUB_TOKEN}" \
             -Djib.to.image="${DOCKERHUB_REPO}/ojp:${{ github.event.inputs.tag }}" \
