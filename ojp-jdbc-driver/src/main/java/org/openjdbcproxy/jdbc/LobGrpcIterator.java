@@ -46,8 +46,8 @@ public class LobGrpcIterator implements Iterator<LobDataBlock> {
         if (this.error != null) {
             throw new RuntimeException(this.error);
         }
-        LobDataBlock block = this.blocksReceived.getFirst();
-        this.blocksReceived.removeFirst();
+        LobDataBlock block = this.blocksReceived.get(0);
+        this.blocksReceived.remove(0);
         return block;
     }
 

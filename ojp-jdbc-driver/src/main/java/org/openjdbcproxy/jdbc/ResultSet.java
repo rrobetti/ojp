@@ -162,7 +162,8 @@ public class ResultSet extends RemoteProxyResultSet {
         }
         lastValueRead = currentDataBlock.get(blockIdx.get())[columnIndex - 1];
         Object value = lastValueRead;
-        if (value instanceof Long lValue) {
+        if (value instanceof Long) {
+            Long lValue = (Long) value;
             return lValue.intValue();
         } else {
             return (int) value;
@@ -185,7 +186,8 @@ public class ResultSet extends RemoteProxyResultSet {
         }
         lastValueRead = currentDataBlock.get(blockIdx.get())[columnIndex -1];
         Object value = lastValueRead;
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.floatValue();
         }
         return (float) value;
@@ -198,7 +200,8 @@ public class ResultSet extends RemoteProxyResultSet {
         }
         lastValueRead = currentDataBlock.get(blockIdx.get())[columnIndex -1];
         Object value = lastValueRead;
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.doubleValue();
         }
         return (double) value;
@@ -229,7 +232,8 @@ public class ResultSet extends RemoteProxyResultSet {
         }
         lastValueRead = currentDataBlock.get(blockIdx.get())[columnIndex -1];
         Object result = lastValueRead;
-        if (result instanceof Timestamp timestamp) {
+        if (result instanceof Timestamp) {
+            Timestamp timestamp = (Timestamp) result;
             return new Date(timestamp.getTime());
         }
         return (Date) result;
@@ -335,7 +339,8 @@ public class ResultSet extends RemoteProxyResultSet {
         int colIdx = this.labelsMap.get(columnLabel.toUpperCase()) + 1;
         lastValueRead = currentDataBlock.get(blockIdx.get())[colIdx - 1];
         Object value = lastValueRead;
-        if (value instanceof Long lValue) {
+        if (value instanceof Long) {
+            Long lValue = (Long) value;
             return lValue.intValue();
         } else {
             return (int) value;
@@ -360,7 +365,8 @@ public class ResultSet extends RemoteProxyResultSet {
         int colIdx = this.labelsMap.get(columnLabel.toUpperCase()) + 1;
         lastValueRead = currentDataBlock.get(blockIdx.get())[colIdx - 1];
         Object value = lastValueRead;
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.floatValue();
         }
         return (float) value;
@@ -374,7 +380,8 @@ public class ResultSet extends RemoteProxyResultSet {
         int colIdx = this.labelsMap.get(columnLabel.toUpperCase()) + 1;
         lastValueRead = currentDataBlock.get(blockIdx.get())[colIdx - 1];
         Object value = lastValueRead;
-        if (value instanceof BigDecimal bdValue) {
+        if (value instanceof BigDecimal) {
+            BigDecimal bdValue = (BigDecimal) value;
             return bdValue.doubleValue();
         }
         return (double) value;
@@ -406,7 +413,8 @@ public class ResultSet extends RemoteProxyResultSet {
         int colIdx = this.labelsMap.get(columnLabel.toUpperCase()) + 1;
         lastValueRead = currentDataBlock.get(blockIdx.get())[colIdx - 1];
         Object result = lastValueRead;
-        if (result instanceof Timestamp timestamp) {
+        if (result instanceof Timestamp) {
+            Timestamp timestamp = (Timestamp) result;
             return new Date(timestamp.getTime());
         }
         return (Date) result;

@@ -990,20 +990,20 @@ public class PostgresMiniStressTest {
         // Heavy query, will fail every time
         timeAndRun(() -> {
             try (Connection conn = getConnection(driverClass, url, user, password)) {
-                try (PreparedStatement pst = conn.prepareStatement("""
-                        SELECT
-                          u.id,
-                          COUNT(o.id) AS num_orders,
-                          SUM(oi.quantity) AS total_quantity,
-                          AVG(p.price) AS avg_price,
-                          (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) AS avg_rating,
-                          1 / 0 AS failHere
-                        FROM users u
-                        JOIN orders o ON u.id = o.user_id
-                        JOIN order_items oi ON o.id = oi.order_id
-                        JOIN products p ON oi.product_id = p.id
-                        GROUP BY u.id, p.id
-                        """)) {
+                try (PreparedStatement pst = conn.prepareStatement(
+                        "SELECT" +
+                        "  u.id," +
+                        "  COUNT(o.id) AS num_orders," +
+                        "  SUM(oi.quantity) AS total_quantity," +
+                        "  AVG(p.price) AS avg_price," +
+                        "  (SELECT AVG(rating) FROM reviews WHERE product_id = p.id) AS avg_rating," +
+                        "  1 / 0 AS failHere" +
+                        "FROM users u" +
+                        "JOIN orders o ON u.id = o.user_id" +
+                        "JOIN order_items oi ON o.id = oi.order_id" +
+                        "JOIN products p ON oi.product_id = p.id" +
+                        "GROUP BY u.id, p.id"
+                        )) {
                     try (ResultSet rs = pst.executeQuery()) {
                         while (rs.next()) {
                             rs.getInt(1);

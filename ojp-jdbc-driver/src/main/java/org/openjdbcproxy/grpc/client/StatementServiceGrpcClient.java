@@ -204,8 +204,9 @@ public class StatementServiceGrpcClient implements StatementService {
 
                         @Override
                         public void onError(Throwable throwable) {
-                            if (throwable instanceof StatusRuntimeException sre) {
+                            if (throwable instanceof StatusRuntimeException) {
                                 try {
+                                    StatusRuntimeException sre = (StatusRuntimeException) throwable;
                                     handle(sre);//To convert to SQLException if possible
                                     sfFirstLobReference.setException(sre);
                                     sfFinalLobReference.setException(sre); //When conversion to SQLException not possible
@@ -334,8 +335,8 @@ public class StatementServiceGrpcClient implements StatementService {
 
             //Wait to receive at least one successful block before returning.
             if (!sfFirstBlockReceived.get() && errorReceived[0] != null) {
-                if (errorReceived[0] instanceof Exception e) {
-                    throw e;
+                if (errorReceived[0] instanceof Exception) {
+                    throw (Exception) errorReceived[0];
                 } else {
                     throw new RuntimeException(errorReceived[0]);
                 }
@@ -401,9 +402,9 @@ public class StatementServiceGrpcClient implements StatementService {
             @Override
             public void onError(Throwable throwable) {
                 Throwable t = throwable;
-                if (throwable instanceof StatusRuntimeException sre) {
+                if (throwable instanceof StatusRuntimeException) {
                     try {
-                        handle(sre);
+                        handle((StatusRuntimeException) throwable);
                     } catch (SQLException e) {
                         t = e;
                     }

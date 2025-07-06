@@ -27,39 +27,33 @@ public class H2MultipleTypesIntegrationTest {
         System.out.println("Testing for url -> " + url);
 
         try {
-            executeUpdate(conn,
-                    """
-                            drop table test_table
-                            """);
+            executeUpdate(conn, "drop table test_table");
         } catch (Exception e) {
             //Might not find it, not an issue
         }
         executeUpdate(conn,
-                """
-                create table test_table(
-                         val_int              INT NOT NULL,
-                         val_varchar          VARCHAR(50) NOT NULL,
-                         val_double_precision DOUBLE PRECISION,
-                         val_bigint           BIGINT,
-                         val_tinyint          TINYINT,
-                         val_smallint         SMALLINT,
-                         val_boolean          BOOLEAN,
-                         val_decimal          DECIMAL,
-                         val_float            FLOAT(2),
-                         val_byte             BINARY,
-                         val_binary           BINARY(4),
-                         val_date             DATE,
-                         val_time             TIME,
-                         val_timestamp        TIMESTAMP)
-                """);
+                "create table test_table(" +
+                        " val_int INT NOT NULL," +
+                        " val_varchar VARCHAR(50) NOT NULL," +
+                        " val_double_precision DOUBLE PRECISION," +
+                        " val_bigint BIGINT," +
+                        " val_tinyint TINYINT," +
+                        " val_smallint SMALLINT," +
+                        " val_boolean BOOLEAN," +
+                        " val_decimal DECIMAL," +
+                        " val_float FLOAT(2)," +
+                        " val_byte BINARY," +
+                        " val_binary BINARY(4)," +
+                        " val_date DATE," +
+                        " val_time TIME," +
+                        " val_timestamp TIMESTAMP)"
+        );
 
         java.sql.PreparedStatement psInsert = conn.prepareStatement(
-                """
-                    insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint,
-                    val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary, val_date, val_time,
-                    val_timestamp)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """
+                "insert into test_table (val_int, val_varchar, val_double_precision, val_bigint, val_tinyint, " +
+                        "val_smallint, val_boolean, val_decimal, val_float, val_byte, val_binary, val_date, val_time, " +
+                        "val_timestamp) " +
+                        "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
 
         psInsert.setInt(1, 1);
@@ -115,11 +109,7 @@ public class H2MultipleTypesIntegrationTest {
         Assert.assertEquals("11:12:13", sdfTime.format(resultSet.getTime("val_time")));
         Assert.assertEquals("30/03/2025 21:22:23", sdfTimestamp.format(resultSet.getTimestamp("val_timestamp")));
 
-        executeUpdate(conn,
-                """
-                    delete from test_table where val_int=1
-                    """
-        );
+        executeUpdate(conn, "delete from test_table where val_int=1");
 
         ResultSet resultSetAfterDeletion = psSelect.executeQuery();
         Assert.assertFalse(resultSetAfterDeletion.next());
