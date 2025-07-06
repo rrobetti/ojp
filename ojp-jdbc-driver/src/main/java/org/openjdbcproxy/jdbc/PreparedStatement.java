@@ -117,7 +117,7 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
         this.checkClosed();
         log.info("Executing update for -> {}", this.sql);
         OpResult result = this.statementService.executeUpdate(this.connection.getSession(), this.sql,
-                this.paramsMap.values().stream().toList(), this.getStatementUUID(), null);
+                this.paramsMap.values().stream().toList(), this.getStatementUUID(), this.properties);
         this.connection.setSession(result.getSession());
         return deserialize(result.getValue().toByteArray(), Integer.class);
     }
@@ -706,6 +706,20 @@ public class PreparedStatement extends Statement implements java.sql.PreparedSta
     public Map<String, Object> getProperties() {
         this.propertiesHaveSqlStatement();
         return this.properties;
+    }
+
+    /**
+     * Has to override the Statement implementation because PreparedStatement has to send extra properties like the SQL
+     * being executed, which Statement does not.
+     *
+     * @return RemoteProxyResultSet
+     * @throws SQLException
+     */
+    @Override
+    public RemoteProxyResultSet getGeneratedKeys() throws SQLException {
+        checkClosed();
+        String resultSetUUID = this.callProxy(CallType.CALL_GET, "GeneratedKeys", String.class);
+        return new RemoteProxyResultSet(resultSetUUID, this.statementService, this.connection, this);
     }
 
     /**

@@ -59,10 +59,16 @@ message StatementRequest {
     bytes properties = 5;
 }
 
+enum SqlErrorType {
+    SQL_EXCEPTION = 0;
+    SQL_DATA_EXCEPTION = 1;
+}
+
 message SqlErrorResponse {
     string reason = 1;
     string sqlState = 2;
     int32 vendorCode = 3;
+    SqlErrorType sqlErrorType = 4;
 }
 
 //LT stands for Lob Type

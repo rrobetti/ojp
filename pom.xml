@@ -5,8 +5,12 @@
 
     <groupId>org.openjdbcproxy</groupId>
     <artifactId>ojp-parent</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.0.4-alpha</version>
     <packaging>pom</packaging>
+
+    <name>OJP Parent</name>
+    <url>https://github.com/rrobetti/ojp</url>
+    <description>Parent pom for OJP (Open JDBC Proxy)</description>
 
     <modules>
         <module>ojp-grpc-commons</module>
@@ -46,5 +50,62 @@
             </build>
         </profile>
     </profiles>
+
+    <build>
+        <plugins>
+            <!--Signs the JARs for deployments-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <!--Deploys to maven central-->
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.8.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- Add SCM and project info for Maven Central requirements -->
+    <scm>
+        <url>https://github.com/rrobetti/ojp</url>
+        <connection>scm:git:https://github.com/rrobetti/ojp.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:rrobetti/ojp.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>rrobetti</id>
+            <name>Rogerio Robetti</name>
+        </developer>
+        <developer>
+            <id>petruki</id>
+            <name>Roger Floriano</name>
+        </developer>
+    </developers>
 
 </project>

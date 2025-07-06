@@ -276,6 +276,9 @@ public class H2PreparedStatementExtensiveTests {
         stmt.executeUpdate("INSERT INTO test_table (id, name, age) VALUES (101, 'B', 2)", Statement.RETURN_GENERATED_KEYS);
         ResultSet keys = stmt.getGeneratedKeys();
         assertNotNull(keys);
+        keys.next();
+        Long id = keys.getLong(1);
+        assertNotNull(id);
 
         // Various execute overloads
         stmt.execute("SELECT * FROM test_table", Statement.NO_GENERATED_KEYS);

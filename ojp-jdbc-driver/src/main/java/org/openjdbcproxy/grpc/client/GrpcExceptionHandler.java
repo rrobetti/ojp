@@ -1,11 +1,13 @@
 package org.openjdbcproxy.grpc.client;
 
 import com.openjdbcproxy.grpc.SqlErrorResponse;
+import com.openjdbcproxy.grpc.SqlErrorType;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.ProtoUtils;
 
+import java.sql.SQLDataException;
 import java.sql.SQLException;
 
 public class GrpcExceptionHandler {
@@ -22,7 +24,12 @@ public class GrpcExceptionHandler {
         if (errorResponse == null) {
             return sre;
         }
-        throw new SQLException(errorResponse.getReason(), errorResponse.getSqlState(),
-                errorResponse.getVendorCode());
+        if (SqlErrorType.SQL_DATA_EXCEPTION.equals(errorResponse.getSqlErrorType())) {
+            throw new SQLDataException(errorResponse.getReason(), errorResponse.getSqlState(),
+                    errorResponse.getVendorCode());
+        } else {
+            throw new SQLException(errorResponse.getReason(), errorResponse.getSqlState(),
+                    errorResponse.getVendorCode());
+        }
     }
 }
