@@ -1,1 +1,0 @@
-org.openjdbcproxy.jdbc.Driver,jdbc:ojp[localhost:1059]_postgresql://:5431/postgres,postgres,mysecretpassword
